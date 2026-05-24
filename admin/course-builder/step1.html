@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Course · UpStaff Admin</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@100..700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+    rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Work Sans', 'sans-serif'] },
+          colors: { brand: { light: '#f0f4ff', DEFAULT: '#2563eb', dark: '#1e40af' } },
+          borderRadius: { 'xl': '0.75rem', '2xl': '1rem', '3xl': '1.5rem' }
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      min-height: 100vh;
+      width: 100%;
+    }
+    
+    *:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+    .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 8px; }
+    .dropzone-active { border-color: #3b82f6 !important; background-color: rgba(59, 130, 246, .06); }
+    .ql-container.ql-snow { border: none !important; font-family: 'Work Sans', sans-serif; font-size: .875rem; }
+    .ql-toolbar.ql-snow { border: none !important; border-bottom: 1px solid #e2e8f0 !important; padding: 7px 12px !important; background: #f8fafc; border-radius: .75rem .75rem 0 0; }
+    .ql-editor { min-height: 120px; padding: 14px 16px !important; color: #1e293b; line-height: 1.65; }
+    .ql-editor.ql-blank::before { color: #94a3b8; font-style: normal; }
+    .quill-wrap { border: 1px solid #e2e8f0; border-radius: .75rem; overflow: hidden; background: rgba(248, 250, 252, .5); transition: border-color .15s, box-shadow .15s; }
+    .quill-wrap:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, .12); }
+    .ql-toolbar .ql-stroke { stroke: #64748b; }
+    .ql-toolbar .ql-fill { fill: #64748b; }
+    .ql-toolbar .ql-picker { color: #64748b; }
+    .ql-toolbar button:hover .ql-stroke, .ql-toolbar .ql-active .ql-stroke { stroke: #2563eb !important; }
+    .ql-toolbar button:hover .ql-fill, .ql-toolbar .ql-active .ql-fill { fill: #2563eb !important; }
+    .ql-toolbar button:hover, .ql-toolbar button.ql-active { background: #eff6ff !important; border-radius: 5px; }
+    .ql-toolbar .ql-picker-label:hover { color: #2563eb !important; }
+    .ql-snow .ql-picker-options { border: 1px solid #e2e8f0 !important; border-radius: .5rem !important; box-shadow: 0 4px 16px rgba(0, 0, 0, .08) !important; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-slide-in { animation: slideIn 0.3s ease-out; }
+    .type-btn-active { background-color: #2563eb !important; color: white !important; border-color: #2563eb !important; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3); }
+    .type-btn-inactive { background-color: white; color: #475569; border-color: #e2e8f0; }
+    .type-btn-inactive:hover { background-color: #f8fafc; border-color: #cbd5e1; }
+    
+    /* Header styles */
+    .step-active { background-color: #2563eb; color: white; border-color: #2563eb; }
+    .step-completed { background-color: #10b981; color: white; border-color: #10b981; }
+    .step-inactive { background-color: white; color: #64748b; border-color: #e2e8f0; }
+    .step-clickable { cursor: pointer; transition: all 0.2s ease; }
+    .step-clickable:hover { transform: translateY(-2px); filter: brightness(0.95); }
+  </style>
+</head>
+
+<body class="bg-gradient-to-br from-slate-50 to-slate-100 font-sans text-slate-800 antialiased">
+
+  <!-- ==================== HEADER SECTION ==================== -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-20 w-full shadow-sm">
+    <div class="w-full px-4 sm:px-6 md:px-8 lg:px-12 py-4">
+      
+      <div class="relative mt-2">
+        <div class="absolute top-5 left-0 w-full h-0.5 bg-slate-200 hidden sm:block"></div>
+        <div class="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
+          <div class="flex items-center gap-3 sm:flex-1 step-clickable" id="step1-container">
+            <div class="relative z-10">
+              <div id="step1-circle" class="step-active w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all">
+                <span class="material-symbols-outlined text-sm">menu_book</span>
+              </div>
+            </div>
+            <div class="sm:flex-1">
+              <p class="text-sm font-semibold text-blue-700" id="step1-label">Step 1</p>
+              <p class="text-xs text-slate-500">Basic Info</p>
+            </div>
+            <div class="hidden sm:block flex-1 h-0.5 bg-slate-200"></div>
+          </div>
+
+          <div class="flex items-center gap-3 sm:flex-1 step-clickable" id="step2-container">
+            <div class="relative z-10">
+              <div id="step2-circle" class="step-inactive w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all">
+                <span class="material-symbols-outlined text-sm">quiz</span>
+              </div>
+            </div>
+            <div class="sm:flex-1">
+              <p class="text-sm font-semibold text-slate-500" id="step2-label">Step 2</p>
+              <p class="text-xs text-slate-500">Quizzes</p>
+            </div>
+            <div class="hidden sm:block flex-1 h-0.5 bg-slate-200"></div>
+          </div>
+
+          <div class="flex items-center gap-3 sm:flex-1 step-clickable" id="step3-container">
+            <div class="relative z-10">
+              <div id="step3-circle" class="step-inactive w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all">
+                <span class="material-symbols-outlined text-sm">checklist</span>
+              </div>
+            </div>
+            <div class="sm:flex-1">
+              <p class="text-sm font-semibold text-slate-500" id="step3-label">Step 3</p>
+              <p class="text-xs text-slate-500">Review & Publish</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 flex items-center gap-3">
+        <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div id="progressFill" class="h-full bg-blue-600 rounded-full transition-all duration-300" style="width: 33%"></div>
+        </div>
+        <span id="progressPercent" class="text-xs font-medium text-slate-500">33% complete</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN CONTENT ==================== -->
+  <main class="w-full px-4 sm:px-6 md:px-8 lg:px-12 py-8 pb-32 space-y-8">
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white shadow-lg animate-slide-in">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl">celebration</span>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold">Create Your Course</h1>
+          <p class="text-blue-100 text-sm mt-1">Fill in the details below to get started</p>
+        </div>
+      </div>
+    </div>
+
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden animate-slide-in">
+      <div class="p-6 sm:p-8">
+        <div class="flex items-start gap-3 mb-6">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-md">
+            <span class="material-symbols-outlined text-xl">menu_book</span>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-slate-800">Course basics</h2>
+            <p class="text-sm text-slate-500 mt-0.5">The foundation of your course — name, category, and description</p>
+          </div>
+        </div>
+        <div class="space-y-6">
+          <div>
+            <label for="courseTitle" class="block text-sm font-semibold text-slate-700 mb-1.5">Course title <span class="text-red-500">*</span></label>
+            <input id="courseTitle" type="text" maxlength="80" placeholder="e.g. Advanced UI/UX Design Masterclass"
+              class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition bg-slate-50/50 hover:bg-white">
+            <div class="flex items-center justify-between mt-2">
+              <p class="text-xs text-slate-400 flex items-center gap-1"><span class="material-symbols-outlined text-xs">lightbulb</span> Keep it short and catchy (max 60 characters)</p>
+              <span id="titleCounter" class="text-xs tabular-nums font-medium px-2 py-0.5 rounded-full bg-slate-100">0 / 60</span>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Course type</label>
+            <div class="flex flex-wrap gap-3">
+              <button data-type="general" class="type-btn type-btn-active px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 shadow-sm flex items-center gap-2">
+                <span class="material-symbols-outlined text-base">school</span> General Skills
+              </button>
+              <button data-type="upskilling" class="type-btn type-btn-inactive px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2">
+                <span class="material-symbols-outlined text-base">trending_up</span> Upskilling
+              </button>
+            </div>
+          </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label for="courseCategory" class="block text-sm font-semibold text-slate-700 mb-1.5">Category</label>
+                <div class="relative">
+                  <select id="courseCategory" class="w-full appearance-none px-4 py-3 border border-slate-200 rounded-xl bg-slate-50/50 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition hover:bg-white cursor-pointer">
+                    <option>Office Productivity & Collaboration</option>
+                    <option>Accounting & Financial Software QuickBooks</option>
+                    <option>Project Management & Task Tracking</option>
+                    <option>Customer Relationship Management (CRM)</option>
+                    <option>Design & Creative Tools Canva</option>
+                    <option>E-commerce & Marketplace Tools Shopify</option>
+                    <option>Document & Workflow Management</option>
+                    <option>Programming & Development Tools / Languages</option>
+                  </select>
+                  <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+                </div>
+              </div>
+              <div>
+                <label for="courseDifficulty" class="block text-sm font-semibold text-slate-700 mb-1.5">Difficulty level</label>
+                <div class="relative">
+                  <select id="courseDifficulty" class="w-full appearance-none px-4 py-3 border border-slate-200 rounded-xl bg-slate-50/50 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition hover:bg-white cursor-pointer">
+                    <option>Beginner</option>
+                    <option>Intermediate</option>
+                    <option>Advanced</option>
+                  </select>
+                  <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+                </div>
+              </div>
+            </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Course description</label>
+            <div class="quill-wrap"><div id="descEditor"></div></div>
+            <div class="flex items-center justify-between mt-2">
+              <p class="text-xs text-slate-400 flex items-center gap-1"><span class="material-symbols-outlined text-xs">info</span> A clear description helps students choose the right course.</p>
+              <span id="descCounter" class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100">0 chars</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden animate-slide-in">
+      <div class="p-6 sm:p-8">
+        <div class="flex items-start gap-3 mb-6">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white flex items-center justify-center shadow-md">
+            <span class="material-symbols-outlined text-xl">movie</span>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-slate-800">Course media</h2>
+            <p class="text-sm text-slate-500 mt-0.5">Upload a thumbnail that represents your course</p>
+          </div>
+        </div>
+        <div id="thumbnailDropzone" class="border-2 border-dashed border-slate-200 rounded-2xl p-8 hover:border-blue-400 hover:bg-blue-50/20 transition-all duration-200 cursor-pointer group">
+          <input type="file" id="thumbnailInput" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden">
+          <div id="uploadPlaceholder" class="flex flex-col items-center text-center">
+            <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+              <span class="material-symbols-outlined text-3xl">cloud_upload</span>
+            </div>
+            <p class="text-slate-700 font-medium">Drag & drop an image, or <span class="text-blue-600 hover:underline">browse</span></p>
+            <p class="text-sm text-slate-400 mt-1">Supports JPG, PNG, GIF • 750×422 px recommended</p>
+          </div>
+          <div id="previewContainer" class="hidden">
+            <img id="thumbnailPreview" src="" alt="Preview" class="w-full rounded-xl object-cover max-h-60 shadow-md">
+            <div class="mt-3 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-green-500 text-base">check_circle</span>
+                <span id="thumbnailFileName" class="text-xs text-slate-500 truncate max-w-xs"></span>
+              </div>
+              <button id="removeThumbnailBtn" class="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 transition px-2 py-1 rounded-lg hover:bg-red-50">
+                <span class="material-symbols-outlined text-sm">close</span> Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== FOOTER SECTION ==================== -->
+  <footer class="fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-sm border-t border-slate-200 py-3 z-10">
+    <div class="w-full px-4 sm:px-6 md:px-8 lg:px-12 flex items-center justify-between">
+      <button id="footerBackBtn" class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition">
+        <span class="material-symbols-outlined text-sm">arrow_back</span> Back
+      </button>
+      <div class="flex items-center gap-4">
+        <p id="stepIndicator" class="text-xs text-slate-400 hidden sm:block">Step 1 of 3 • Basic info</p>
+        <button id="saveDraftFooter" class="hidden sm:inline-flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 bg-white hover:bg-slate-50 shadow-sm transition">
+          <span class="material-symbols-outlined text-base">save</span> Save draft
+        </button>
+        <button id="saveContinue" class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow-sm shadow-blue-200 transition">
+          Save & continue <span class="material-symbols-outlined text-sm">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toastContainer" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none"></div>
+
+  <script>
+    // ==================== GLOBAL VARIABLES ====================
+    window.currentStep = 1;
+    let courseId = null;
+    
+    // Get the base path dynamically
+    const pathParts = window.location.pathname.split('/');
+    const basePath = pathParts.length > 1 && pathParts[1] !== 'step1.html' && pathParts[1] !== 'step2.html' && pathParts[1] !== 'step3.html' ? pathParts[1] : '';
+    const baseUrl = basePath ? `/${basePath}` : '';
+
+    function fixImageUrl(url) {
+      if (!url || url === '') return '';
+      if (baseUrl && url.startsWith(baseUrl)) return url;
+      if (url.startsWith('/uploads/')) {
+        return baseUrl ? `${baseUrl}${url}` : url;
+      }
+      if (!url.startsWith('/') && !url.startsWith('http')) {
+        return baseUrl ? `${baseUrl}/uploads/${url}` : `/uploads/${url}`;
+      }
+      return url;
+    }
+
+    function getRelativePathForSave(url) {
+      if (!url || url === '') return '';
+      if (baseUrl && url.startsWith(baseUrl)) {
+        return url.substring(baseUrl.length);
+      }
+      return url;
+    }
+
+    window.showToast = function(msg, type = 'success') {
+      const c = document.getElementById('toastContainer');
+      const t = document.createElement('div');
+      const bg = type === 'error' ? 'bg-red-500' : type === 'warning' ? 'bg-amber-500' : 'bg-slate-800';
+      const ic = type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'check_circle';
+      t.className = `pointer-events-auto flex items-center gap-2 px-5 py-3 ${bg} text-white text-sm font-medium rounded-xl shadow-lg opacity-0 translate-y-2 transition-all duration-300`;
+      t.innerHTML = `<span class="material-symbols-outlined text-base">${ic}</span>${msg}`;
+      c.appendChild(t);
+      requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateY(0)'; });
+      setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; setTimeout(() => t.remove(), 300); }, 3000);
+    };
+
+    function getCourseIdFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('id');
+    }
+
+    function navigateToStep(page) {
+      const courseId = getCourseIdFromUrl();
+      if (courseId) {
+        window.location.href = `${page}?id=${courseId}`;
+      } else {
+        window.location.href = page;
+      }
+    }
+
+    function getCurrentStepFromPage() {
+      const path = window.location.pathname;
+      if (path.includes('step1.html')) return 1;
+      if (path.includes('step2.html')) return 2;
+      if (path.includes('step3.html')) return 3;
+      return window.currentStep || 1;
+    }
+
+    async function isStepAccessible(targetStep) {
+      const currentStep = getCurrentStepFromPage();
+      if (targetStep < currentStep) return true;
+      if (targetStep > currentStep) {
+        if (typeof window.showToast === 'function') {
+          window.showToast(`Please complete Step ${currentStep} first`, 'warning');
+        }
+        return false;
+      }
+      return true;
+    }
+
+    function updateStepIndicator() {
+      const step = getCurrentStepFromPage();
+      const stepText = document.getElementById('stepIndicator');
+      if (stepText) {
+        if (step === 1) stepText.innerText = 'Step 1 of 3 • Basic info';
+        else if (step === 2) stepText.innerText = 'Step 2 of 3 • Quizzes';
+        else if (step === 3) stepText.innerText = 'Step 3 of 3 • Review & Publish';
+      }
+    }
+
+    function setButtonLoading(button, isLoading, originalText) {
+      if (isLoading) {
+        button.disabled = true;
+        button.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">progress_activity</span> Saving...';
+      } else {
+        button.disabled = false;
+        button.innerHTML = originalText;
+      }
+    }
+
+    // ==================== QUILL EDITOR ====================
+    const descQuill = new Quill('#descEditor', { 
+      theme: 'snow', 
+      placeholder: 'Describe what students will learn...', 
+      modules: { toolbar: [[{ header: [2, 3, false]}], ['bold', 'italic', 'underline'], [{ list: 'ordered' }, { list: 'bullet'}], ['link', 'blockquote', 'code-block'], ['clean']] } 
+    });
+    
+    descQuill.on('text-change', () => { 
+      const len = descQuill.getText().trim().length; 
+      const el = document.getElementById('descCounter'); 
+      el.textContent = `${len} char${len !== 1 ? 's' : ''}`; 
+      el.className = `text-xs font-medium px-2 py-0.5 rounded-full ${len > 0 && len < 50 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`; 
+    });
+
+    // ==================== LOAD EXISTING COURSE ====================
+    async function loadExistingCourse() {
+      const id = getCourseIdFromUrl();
+      if (!id) return;
+      
+      try {
+        const response = await fetch(`api/get_course.php?id=${id}`);
+        const result = await response.json();
+        
+        if (result.success && result.course) {
+          courseId = result.course.id;
+          const course = result.course;
+          
+          document.getElementById('courseTitle').value = course.title || '';
+          document.getElementById('courseCategory').value = course.category || 'Design';
+          document.getElementById('courseDifficulty').value = course.difficulty || 'Beginner';
+          
+          const typeBtn = document.querySelector(`.type-btn[data-type="${course.type}"]`);
+          if (typeBtn) activateTypeBtn(typeBtn);
+          
+          if (course.description && course.description !== '<p><br></p>') {
+            descQuill.root.innerHTML = course.description;
+            const len = descQuill.getText().trim().length;
+            document.getElementById('descCounter').textContent = `${len} chars`;
+          }
+          
+          if (course.thumbnail_url && course.thumbnail_url !== '') {
+            const fixedUrl = fixImageUrl(course.thumbnail_url);
+            thumbnailPreview.src = fixedUrl;
+            thumbnailFileName.textContent = 'Existing thumbnail';
+            uploadPlaceholder.classList.add('hidden');
+            previewContainer.classList.remove('hidden');
+          }
+          
+          updateTitleCounter();
+          showToast('Course loaded successfully');
+        } else {
+          showToast(result.error || 'Failed to load course', 'error');
+        }
+      } catch (error) {
+        console.error('Error loading course:', error);
+        showToast('Failed to load course data', 'error');
+      }
+    }
+
+    // ==================== THUMBNAIL UPLOAD ====================
+    async function uploadThumbnail(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('api/uploads.php', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (result.success) {
+        let url = result.url;
+        if (url && !url.startsWith('/')) {
+          url = '/' + url;
+        }
+        return fixImageUrl(url);
+      }
+      throw new Error(result.error || 'Upload failed');
+    }
+
+    // ==================== THUMBNAIL HANDLERS ====================
+    const dropzone = document.getElementById('thumbnailDropzone');
+    const fileInput = document.getElementById('thumbnailInput');
+    const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+    const previewContainer = document.getElementById('previewContainer');
+    const thumbnailPreview = document.getElementById('thumbnailPreview');
+    const thumbnailFileName = document.getElementById('thumbnailFileName');
+    
+    // Clean up existing listeners by cloning and replacing
+    const newDropzone = dropzone.cloneNode(true);
+    dropzone.parentNode.replaceChild(newDropzone, dropzone);
+    
+    const newFileInput = fileInput.cloneNode(true);
+    fileInput.parentNode.replaceChild(newFileInput, fileInput);
+    
+    const newUploadPlaceholder = uploadPlaceholder.cloneNode(true);
+    uploadPlaceholder.parentNode.replaceChild(newUploadPlaceholder, uploadPlaceholder);
+    
+    const newPreviewContainer = previewContainer.cloneNode(true);
+    previewContainer.parentNode.replaceChild(newPreviewContainer, previewContainer);
+    
+    const newThumbnailPreview = thumbnailPreview.cloneNode(true);
+    thumbnailPreview.parentNode.replaceChild(newThumbnailPreview, thumbnailPreview);
+    
+    const newThumbnailFileName = thumbnailFileName.cloneNode(true);
+    thumbnailFileName.parentNode.replaceChild(newThumbnailFileName, thumbnailFileName);
+    
+    // Reassign variables to new elements
+    const finalDropzone = document.getElementById('thumbnailDropzone');
+    const finalFileInput = document.getElementById('thumbnailInput');
+    const finalUploadPlaceholder = document.getElementById('uploadPlaceholder');
+    const finalPreviewContainer = document.getElementById('previewContainer');
+    const finalThumbnailPreview = document.getElementById('thumbnailPreview');
+    const finalThumbnailFileName = document.getElementById('thumbnailFileName');
+    
+    finalDropzone.addEventListener('click', e => { 
+      if (!e.target.closest('#removeThumbnailBtn')) finalFileInput.click(); 
+    });
+    
+    finalDropzone.addEventListener('dragover', e => { 
+      e.preventDefault(); 
+      finalDropzone.classList.add('dropzone-active'); 
+    });
+    
+    finalDropzone.addEventListener('dragleave', e => { 
+      if (!finalDropzone.contains(e.relatedTarget)) finalDropzone.classList.remove('dropzone-active'); 
+    });
+    
+    finalDropzone.addEventListener('drop', e => { 
+      e.preventDefault(); 
+      finalDropzone.classList.remove('dropzone-active'); 
+      if (e.dataTransfer.files[0]) handleThumbnail(e.dataTransfer.files[0]); 
+    });
+    
+    finalFileInput.addEventListener('change', () => { 
+      if (finalFileInput.files[0]) handleThumbnail(finalFileInput.files[0]); 
+    });
+    
+    // Fix remove button listener
+    const removeBtn = document.getElementById('removeThumbnailBtn');
+    if (removeBtn) {
+      const newRemoveBtn = removeBtn.cloneNode(true);
+      removeBtn.parentNode.replaceChild(newRemoveBtn, removeBtn);
+      newRemoveBtn.addEventListener('click', e => { 
+        e.stopPropagation(); 
+        removeThumbnail(); 
+      });
+    }
+    
+    async function handleThumbnail(file) {
+      if (!file.type.startsWith('image/')) { 
+        showToast('Please upload a valid image file', 'error'); 
+        return; 
+      }
+      if (file.size > 10 * 1024 * 1024) { 
+        showToast('Image must be smaller than 10MB', 'error'); 
+        return; 
+      }
+      try {
+        const url = await uploadThumbnail(file);
+        finalThumbnailPreview.src = url;
+        finalThumbnailFileName.textContent = `${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
+        finalUploadPlaceholder.classList.add('hidden'); 
+        finalPreviewContainer.classList.remove('hidden');
+        showToast('Thumbnail uploaded successfully');
+      } catch(error) {
+        showToast('Upload failed: ' + error.message, 'error');
+      }
+    }
+    
+    function removeThumbnail() { 
+      finalThumbnailPreview.src = ''; 
+      finalFileInput.value = ''; 
+      finalUploadPlaceholder.classList.remove('hidden'); 
+      finalPreviewContainer.classList.add('hidden'); 
+    }
+
+    // ==================== SAVE FUNCTIONS ====================
+    window.saveToDatabase = async function(status = 'draft') {
+      let thumbnailUrl = document.getElementById('thumbnailPreview').src || '';
+      thumbnailUrl = getRelativePathForSave(thumbnailUrl);
+      
+      const courseData = {
+        course_id: courseId,
+        title: document.getElementById('courseTitle').value.trim(),
+        type: document.querySelector('.type-btn-active')?.dataset.type || 'general',
+        category: document.getElementById('courseCategory').value,
+        difficulty: document.getElementById('courseDifficulty').value,
+        description: descQuill.root.innerHTML,
+        thumbnail_url: thumbnailUrl,
+        status: status
+      };
+      
+      try {
+        const response = await fetch('api/save_step1.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(courseData)
+        });
+        const result = await response.json();
+        if (result.success) {
+          courseId = result.course_id;
+          showToast(`Course ${status === 'published' ? 'published' : 'saved'} successfully!`);
+          return { success: true, course_id: courseId };
+        } else {
+          showToast(result.error || 'Failed to save', 'error');
+          return { success: false };
+        }
+      } catch(error) {
+        showToast('Failed to save course: ' + error.message, 'error');
+        return { success: false };
+      }
+    };
+
+    window.saveDraft = async function() { 
+      const result = await saveToDatabase('draft');
+      return result;
+    };
+    
+    window.validateForm = function() {
+      const title = document.getElementById('courseTitle').value.trim();
+      if (!title) { showToast('Please enter a course title', 'error'); return false; }
+      if (title.length > 60) { showToast('Title must be 60 characters or fewer', 'warning'); return false; }
+      return true;
+    };
+
+    // ==================== UI HELPERS ====================
+    function activateTypeBtn(btn) {
+      document.querySelectorAll('.type-btn').forEach(b => { 
+        b.classList.remove('type-btn-active'); 
+        b.classList.add('type-btn-inactive'); 
+      });
+      btn.classList.remove('type-btn-inactive'); 
+      btn.classList.add('type-btn-active');
+    }
+    
+    // Clean up and reattach type button listeners
+    const typeBtns = document.querySelectorAll('.type-btn');
+    typeBtns.forEach(btn => {
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+      newBtn.addEventListener('click', () => activateTypeBtn(newBtn));
+    });
+
+    function updateTitleCounter() {
+      const titleInput = document.getElementById('courseTitle');
+      if (!titleInput) return;
+      const len = titleInput.value.length;
+      const el = document.getElementById('titleCounter');
+      if (el) {
+        el.textContent = `${len} / 60`;
+        el.className = `text-xs font-medium px-2 py-0.5 rounded-full ${len > 60 ? 'bg-red-100 text-red-700' : len > 45 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`;
+      }
+    }
+    
+    const titleInput = document.getElementById('courseTitle');
+    if (titleInput) {
+      const newTitleInput = titleInput.cloneNode(true);
+      titleInput.parentNode.replaceChild(newTitleInput, titleInput);
+      newTitleInput.addEventListener('input', updateTitleCounter);
+    }
+
+    // ==================== INITIALIZE ====================
+    function initFooter() {
+      updateStepIndicator();
+
+      const backBtn = document.getElementById('footerBackBtn');
+      const saveDraftBtn = document.getElementById('saveDraftFooter');
+      const saveContinueBtn = document.getElementById('saveContinue');
+
+      if (backBtn) {
+        const newBackBtn = backBtn.cloneNode(true);
+        backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+        newBackBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          window.location.href = '../course_management.php';
+        });
+      }
+
+      if (saveDraftBtn) {
+        const newSaveDraftBtn = saveDraftBtn.cloneNode(true);
+        saveDraftBtn.parentNode.replaceChild(newSaveDraftBtn, saveDraftBtn);
+        newSaveDraftBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const originalText = newSaveDraftBtn.innerHTML;
+          setButtonLoading(newSaveDraftBtn, true, originalText);
+          if (typeof window.saveDraft === 'function') {
+            try {
+              await window.saveDraft();
+            } catch (error) {
+              console.error('Save error:', error);
+            }
+          }
+          setButtonLoading(newSaveDraftBtn, false, originalText);
+        });
+      }
+
+      if (saveContinueBtn) {
+        const newSaveContinueBtn = saveContinueBtn.cloneNode(true);
+        saveContinueBtn.parentNode.replaceChild(newSaveContinueBtn, saveContinueBtn);
+        newSaveContinueBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const step = getCurrentStepFromPage();
+          const originalText = newSaveContinueBtn.innerHTML;
+          
+          if (step === 1) {
+            if (typeof window.validateForm === 'function' && window.validateForm()) {
+              setButtonLoading(newSaveContinueBtn, true, originalText);
+              try {
+                const result = await window.saveDraft();
+                const courseId = result?.course_id || getCourseIdFromUrl();
+                if (courseId) {
+                  navigateToStep(`step2.html?id=${courseId}`);
+                } else {
+                  navigateToStep('step2.html');
+                }
+              } catch (error) {
+                setButtonLoading(newSaveContinueBtn, false, originalText);
+                showToast('Error saving: ' + error.message, 'error');
+              }
+            }
+          }
+        });
+      }
+    }
+
+    // ==================== HEADER NAVIGATION ====================
+    document.addEventListener('DOMContentLoaded', function() {
+      initFooter();
+      
+      const step1Container = document.getElementById('step1-container');
+      const step2Container = document.getElementById('step2-container');
+      const step3Container = document.getElementById('step3-container');
+      
+      if (step1Container) {
+        const newStep1 = step1Container.cloneNode(true);
+        step1Container.parentNode.replaceChild(newStep1, step1Container);
+        newStep1.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const currentStep = getCurrentStepFromPage();
+          if (currentStep === 1) return;
+          if (await isStepAccessible(1)) navigateToStep('step1.html');
+        });
+      }
+      
+      if (step2Container) {
+        const newStep2 = step2Container.cloneNode(true);
+        step2Container.parentNode.replaceChild(newStep2, step2Container);
+        newStep2.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const currentStep = getCurrentStepFromPage();
+          if (currentStep === 2) return;
+          if (await isStepAccessible(2)) navigateToStep('step2.html');
+        });
+      }
+      
+      if (step3Container) {
+        const newStep3 = step3Container.cloneNode(true);
+        step3Container.parentNode.replaceChild(newStep3, step3Container);
+        newStep3.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const currentStep = getCurrentStepFromPage();
+          if (currentStep === 3) return;
+          if (await isStepAccessible(3)) navigateToStep('step3.html');
+        });
+      }
+    });
+
+    // Initialize
+    if (!document.querySelector('.type-btn-active')) {
+      const defaultBtn = document.querySelector('[data-type="general"]');
+      if (defaultBtn) activateTypeBtn(defaultBtn);
+    }
+    loadExistingCourse();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Step 2 · Build Quizzes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0,1" rel="stylesheet" />
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      min-height: 100vh;
+      width: 100%;
+    }
+    
+    .dropzone-active { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
+    .quill-wrap { border: 1px solid #e2e8f0; border-radius: 1rem; overflow: hidden; background: white; }
+    .quill-wrap:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    .quiz-card { transition: all 0.2s; scroll-margin-top: 20px; }
+    .add-option-btn { background: #f1f5f9; border-radius: 40px; padding: 6px 14px; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.1s; }
+    .add-option-btn:hover { background: #e2e8f0; }
+    .option-row { display: flex; align-items: center; gap: 16px; background: #ffffff; border-radius: 16px; padding: 12px 16px; border: 1px solid #e2e8f0; transition: all 0.1s; margin-bottom: 8px; }
+    .option-row.correct-highlight { background: #dcfce7 !important; border-color: #22c55e !important; box-shadow: 0 2px 6px rgba(34,197,94,0.1); }
+    .correct-radio { accent-color: #16a34a; width: 20px; height: 20px; margin: 0; cursor: pointer; }
+    .delete-opt-btn { opacity: 0.6; transition: 0.1s; cursor: pointer; }
+    .delete-opt-btn:hover { opacity: 1; color: #ef4444; }
+    .quiz-settings-panel { background: linear-gradient(135deg, #f8fafc, #ffffff); border: 1px solid #e2e8f0; border-radius: 1.5rem; }
+    .quiz-title-input { font-size: 1.35rem; font-weight: 600; }
+    .add-quiz-zone { border: 2px dashed #cbd5e1; border-radius: 1.5rem; transition: all 0.2s; cursor: pointer; }
+    .add-quiz-zone:hover { border-color: #3b82f6; background-color: #eff6ff; }
+    
+    /* Header styles */
+    .step-active { background-color: #2563eb; color: white; border-color: #2563eb; }
+    .step-completed { background-color: #10b981; color: white; border-color: #10b981; }
+    .step-inactive { background-color: white; color: #64748b; border-color: #e2e8f0; }
+    .step-clickable { cursor: pointer; transition: all 0.2s ease; }
+    .step-clickable:hover { transform: translateY(-2px); filter: brightness(0.95); }
+    
+    /* Progress bar for upload */
+    .upload-progress-container {
+      transition: all 0.3s ease;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100 font-sans text-slate-800 antialiased">
+
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-20 w-full shadow-sm">
+    <div class="w-full px-4 sm:px-6 md:px-8 lg:px-12 py-4">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-2xl text-blue-600">school</span>
+          <span class="text-lg font-bold text-slate-800">UpStaff</span>
+          <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full ml-2">Admin</span>
+        </div>
+        <div class="text-xs text-slate-400 hidden sm:block">Course Builder</div>
+      </div>
+      
+      <div class="relative mt-2">
+        <div class="absolute top-5 left-0 w-full h-0.5 bg-slate-200 hidden sm:block"></div>
+        <div class="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
+          <div class="flex items-center gap-3 sm:flex-1 step-clickable" id="step1-container">
+            <div class="relative z-10">
+              <div id="step1-circle" class="step-completed w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all">
+                <span class="material-symbols-outlined text-sm">check</span>
+              </div>
+            </div>
+            <div class="sm:flex-1">
+              <p class="text-sm font-semibold text-green-700" id="step1-label">Step 1</p>
+              <p class="text-xs text-slate-500">Basic Info</p>
+            </div>
+            <div class="hidden sm:block flex-1 h-0.5 bg-slate-200"></div>
+          </div>
+
+          <div class="flex items-center gap-3 sm:flex-1 step-clickable" id="step2-container">
+            <div class="relative z-10">
+              <div id="step2-circle" class="step-active w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all">
+                <span class="material-symbols-outlined text-sm">quiz</span>
+              </div>
+            </div>
+            <div class="sm:flex-1">
+              <p class="text-sm font-semibold text-blue-700" id="step2-label">Step 2</p>
+              <p class="text-xs text-slate-500">Quizzes</p>
+            </div>
+            <div class="hidden sm:block flex-1 h-0.5 bg-slate-200"></div>
+          </div>
+
+          <div class="flex items-center gap-3 sm:flex-1 step-clickable" id="step3-container">
+            <div class="relative z-10">
+              <div id="step3-circle" class="step-inactive w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all">
+                <span class="material-symbols-outlined text-sm">checklist</span>
+              </div>
+            </div>
+            <div class="sm:flex-1">
+              <p class="text-sm font-semibold text-slate-500" id="step3-label">Step 3</p>
+              <p class="text-xs text-slate-500">Review & Publish</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 flex items-center gap-3">
+        <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div id="progressFill" class="h-full bg-blue-600 rounded-full transition-all duration-300" style="width: 66%"></div>
+        </div>
+        <span id="progressPercent" class="text-xs font-medium text-slate-500">66% complete</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN CONTENT ==================== -->
+  <main class="w-full px-4 sm:px-6 md:px-8 lg:px-12 py-8 pb-32 space-y-8">
+    <!-- VIDEO SECTION -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-8">
+      <div class="p-6 border-b border-slate-100 bg-slate-50/40 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><span class="material-symbols-outlined">smart_display</span></div>
+        <div><h2 class="font-semibold text-slate-800 text-lg">Core Video Lesson</h2><p class="text-xs text-slate-500">Title, description & upload</p></div>
+      </div>
+      <div class="p-6 space-y-6">
+        <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Video title *</label><input type="text" id="videoTitle" placeholder="e.g., Introduction to React Hooks" class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"></div>
+        <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Video description</label><div class="quill-wrap"><div id="videoDescQuill"></div></div></div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-2">Upload video file or external link</label>
+          <div id="videoDropzone" class="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center hover:border-blue-400 hover:bg-blue-50/20 transition cursor-pointer">
+            <input type="file" id="videoFileInput" accept="video/mp4,video/mov,video/webm" class="hidden">
+            <div id="uploadPlaceholder" class="flex flex-col items-center">
+              <div class="w-14 h-14 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mx-auto mb-3"><span class="material-symbols-outlined text-3xl">cloud_upload</span></div>
+              <p class="text-sm font-medium text-slate-700">Click or drag video file</p>
+              <p class="text-xs text-slate-400">MP4, MOV, WEBM up to 2GB</p>
+            </div>
+            <div id="uploadReady" class="hidden flex-col items-center"><span class="material-symbols-outlined text-3xl text-green-500 mb-2">check_circle</span><p id="videoFileName" class="text-sm font-medium"></p><button id="removeVideoBtn" type="button" class="text-xs text-red-500 mt-2 hover:underline">Remove</button></div>
+            <div id="uploadProgressContainer" class="hidden w-full mt-4 p-4 bg-blue-50 rounded-xl upload-progress-container">
+              <div class="flex justify-between text-sm text-blue-700 mb-2">
+                <span>📤 Uploading video...</span>
+                <span id="uploadPercent">0%</span>
+              </div>
+              <div class="w-full bg-blue-200 rounded-full h-2 overflow-hidden">
+                <div id="uploadProgressFill" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+              <p class="text-xs text-blue-600 mt-2">Please wait. Large files may take several minutes.</p>
+            </div>
+          </div>
+          <div class="mt-3"><button id="toggleExternalBtn" type="button" class="text-xs flex items-center gap-1 text-blue-600 hover:underline"><span class="material-symbols-outlined text-sm">link</span> Use external URL (YouTube/Vimeo)</button></div>
+          <div id="externalLinkPanel" class="hidden mt-3"><input type="url" id="externalUrlInput" placeholder="https://www.youtube.com/watch?v=..." class="w-full px-4 py-2 border rounded-xl"><button id="applyExternalBtn" class="mt-2 px-4 py-2 bg-slate-100 rounded-lg text-sm">Apply external link</button></div>
+          <div id="videoPreviewArea" class="mt-5 aspect-video bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center relative"><span class="material-symbols-outlined text-5xl text-slate-300">movie</span><p class="absolute bottom-3 text-xs text-slate-400">Preview after upload</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUIZ SETTINGS SECTION - WITH SECURITY SETTINGS INSIDE -->
+    <div class="quiz-settings-panel p-6 rounded-2xl shadow-sm mb-8">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center"><span class="material-symbols-outlined text-base">tune</span></div>
+        <h3 class="font-bold text-slate-800 text-lg">Quiz Settings</h3>
+        <p class="text-xs text-slate-400 ml-2">Configure global timer, passing score and security</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Timer Settings -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="material-symbols-outlined text-blue-500">hourglass_empty</span>
+            <h4 class="font-semibold text-slate-800">Global Quiz Timer</h4>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">Default time limit for ALL quizzes</p>
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 bg-slate-50 rounded-xl border px-4 py-2">
+              <input type="number" id="globalMinutes" min="0" max="180" value="10" class="w-20 text-center text-xl font-bold border-0 focus:ring-0 p-0 bg-transparent">
+              <span class="text-xs uppercase text-slate-400">min</span>
+            </div>
+            <span class="text-slate-300 text-xl">:</span>
+            <div class="flex items-center gap-2 bg-slate-50 rounded-xl border px-4 py-2">
+              <input type="number" id="globalSeconds" min="0" max="59" value="0" class="w-20 text-center text-xl font-bold border-0 focus:ring-0 p-0 bg-transparent">
+              <span class="text-xs uppercase text-slate-400">sec</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Passing Threshold -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="material-symbols-outlined text-emerald-500">target</span>
+            <h4 class="font-semibold text-slate-800">Passing Threshold</h4>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">Minimum score required to pass the quiz</p>
+          <div class="space-y-3">
+            <div class="flex justify-between items-center">
+              <span class="text-sm font-medium text-slate-600">Required score:</span>
+              <span id="thresholdValue" class="text-2xl font-bold text-emerald-600">70%</span>
+            </div>
+            <input type="range" id="thresholdSlider" min="0" max="100" value="70" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+            <div class="flex justify-between text-xs text-slate-400">
+              <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Quiz Security Settings - WITH PREVENT COPY/PASTE -->
+      <div class="mt-6 pt-4 border-t border-slate-200">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="material-symbols-outlined text-blue-500">settings</span>
+          <h4 class="font-semibold text-slate-800">Quiz Security Settings</h4>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label class="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
+            <input type="checkbox" id="randomizeQuestions" class="w-5 h-5 text-blue-600 rounded-lg border-slate-300 focus:ring-blue-500/20">
+            <div>
+              <span class="text-sm font-medium text-slate-700">Randomize question order</span>
+              <p class="text-xs text-slate-400">Shuffles questions every time a student takes the quiz</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
+            <input type="checkbox" id="randomizeOptions" class="w-5 h-5 text-blue-600 rounded-lg border-slate-300 focus:ring-blue-500/20">
+            <div>
+              <span class="text-sm font-medium text-slate-700">Randomize answer choices</span>
+              <p class="text-xs text-slate-400">Shuffles options order for multiple choice questions</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
+            <input type="checkbox" id="hideCorrectAnswers" class="w-5 h-5 text-blue-600 rounded-lg border-slate-300 focus:ring-blue-500/20">
+            <div>
+              <span class="text-sm font-medium text-slate-700">Hide correct answers</span>
+              <p class="text-xs text-slate-400">Don't show correct answers after quiz completion</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition">
+            <input type="checkbox" id="preventCopyPaste" class="w-5 h-5 text-blue-600 rounded-lg border-slate-300 focus:ring-blue-500/20">
+            <div>
+              <span class="text-sm font-medium text-slate-700">Prevent copy/paste</span>
+              <p class="text-xs text-slate-400">Disables copying and pasting during quiz</p>
+            </div>
+          </label>
+        </div>
+        <p class="text-xs text-slate-400 mt-4 flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm text-amber-500">info</span>
+          These settings will be saved and applied when employees take this course
+        </p>
+      </div>
+    </div>
+
+    <!-- QUIZZES SECTION -->
+    <div class="space-y-5">
+      <div class="border-b pb-2">
+        <h2 class="text-2xl font-bold text-slate-800">📋 Quizzes</h2>
+        <p class="text-xs text-slate-400">Click the area below to add a new quiz, then add questions</p>
+      </div>
+      <div id="quizzesContainer" class="space-y-8"></div>
+      <div id="noQuizzesMsg" class="text-center py-12 bg-white rounded-2xl border border-dashed">
+        <span class="material-symbols-outlined text-5xl text-slate-300">quiz</span>
+        <p class="text-slate-400 mt-3">No quizzes yet. Click the area below to start.</p>
+      </div>
+      <div id="addQuizZone" class="add-quiz-zone w-full p-8 flex flex-col items-center justify-center text-center cursor-pointer">
+        <div class="w-16 h-16 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mx-auto mb-3">
+          <span class="material-symbols-outlined text-4xl">add</span>
+        </div>
+        <p class="text-sm font-medium text-slate-700">Add new quiz</p>
+        <p class="text-xs text-slate-400 mt-1">Click to create a quiz</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== FOOTER SECTION ==================== -->
+  <footer class="fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-sm border-t border-slate-200 py-3 z-10">
+    <div class="w-full px-4 sm:px-6 md:px-8 lg:px-12 flex items-center justify-between">
+      <button id="footerBackBtn" class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition">
+        <span class="material-symbols-outlined text-sm">arrow_back</span> Back
+      </button>
+      <div class="flex items-center gap-4">
+        <p id="stepIndicator" class="text-xs text-slate-400 hidden sm:block">Step 2 of 3 • Quizzes</p>
+        <button id="saveDraftFooter" class="hidden sm:inline-flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 bg-white hover:bg-slate-50 shadow-sm transition">
+          <span class="material-symbols-outlined text-base">save</span> Save draft
+        </button>
+        <button id="saveContinue" class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow-sm shadow-blue-200 transition">
+          Save & continue <span class="material-symbols-outlined text-sm">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toastMsg" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none"></div>
+
+  <script>
+    // ==================== GLOBAL VARIABLES ====================
+    window.currentStep = 2;
+    let courseId = null;
+    
+    const pathParts = window.location.pathname.split('/');
+    const basePath = pathParts.length > 1 && pathParts[1] !== 'step1.html' && pathParts[1] !== 'step2.html' && pathParts[1] !== 'step3.html' ? pathParts[1] : '';
+    const baseUrl = basePath ? `/${basePath}` : '';
+
+    function fixMediaUrl(url) {
+      if (!url || url === '') return '';
+      if (baseUrl && url.startsWith(baseUrl)) return url;
+      if (url.startsWith('/uploads/')) {
+        return baseUrl ? `${baseUrl}${url}` : url;
+      }
+      if (!url.startsWith('/') && !url.startsWith('http')) {
+        return baseUrl ? `${baseUrl}/uploads/${url}` : `/uploads/${url}`;
+      }
+      return url;
+    }
+
+    function getRelativePathForSave(url) {
+      if (!url || url === '') return '';
+      if (baseUrl && url.startsWith(baseUrl)) {
+        return url.substring(baseUrl.length);
+      }
+      return url;
+    }
+
+    window.showToast = function(msg, type = 'success') { 
+      const toastDiv = document.getElementById('toastMsg'); 
+      const t = document.createElement('div'); 
+      const bg = type === 'error' ? 'bg-red-500' : type === 'warning' ? 'bg-amber-500' : 'bg-slate-800';
+      const icon = type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'check_circle';
+      t.className = `pointer-events-auto flex items-center gap-2 px-5 py-3 ${bg} text-white text-sm font-medium rounded-xl shadow-lg opacity-0 translate-y-2 transition-all duration-300`; 
+      t.innerHTML = `<span class="material-symbols-outlined text-sm">${icon}</span>${msg}`; 
+      toastDiv.innerHTML = ''; 
+      toastDiv.appendChild(t); 
+      setTimeout(()=>{ t.style.opacity = '1'; t.style.transform = 'translateY(0)'; }, 10);
+      setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateY(8px)'; setTimeout(()=>t.remove(),300); },2800); 
+    };
+
+    function getCourseIdFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('id');
+    }
+
+    function navigateToStep(page) {
+      const courseId = getCourseIdFromUrl();
+      if (courseId) {
+        window.location.href = `${page}?id=${courseId}`;
+      } else {
+        window.location.href = page;
+      }
+    }
+
+    function getCurrentStepFromPage() {
+      const path = window.location.pathname;
+      if (path.includes('step1.html')) return 1;
+      if (path.includes('step2.html')) return 2;
+      if (path.includes('step3.html')) return 3;
+      return window.currentStep || 1;
+    }
+
+    async function isStepAccessible(targetStep) {
+      const currentStep = getCurrentStepFromPage();
+      if (targetStep < currentStep) return true;
+      if (targetStep > currentStep) {
+        window.showToast(`Please complete Step ${currentStep} first`, 'warning');
+        return false;
+      }
+      return true;
+    }
+
+    function updateStepIndicator() {
+      const step = getCurrentStepFromPage();
+      const stepText = document.getElementById('stepIndicator');
+      if (stepText) {
+        if (step === 1) stepText.innerText = 'Step 1 of 3 • Basic info';
+        else if (step === 2) stepText.innerText = 'Step 2 of 3 • Quizzes';
+        else if (step === 3) stepText.innerText = 'Step 3 of 3 • Review & Publish';
+      }
+    }
+
+    function setButtonLoading(button, isLoading, originalText) {
+      if (isLoading) {
+        button.disabled = true;
+        button.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">progress_activity</span> Saving...';
+      } else {
+        button.disabled = false;
+        button.innerHTML = originalText;
+      }
+    }
+
+    // ==================== DATA MODELS ====================
+    let videoData = { title: "", descriptionHTML: "", videoFile: null, videoSource: null, externalUrl: "" };
+    let quizzes = [];
+    function genId(prefix) { return prefix + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6); }
+
+    const videoDescEditor = new Quill('#videoDescQuill', { theme: 'snow', placeholder: 'Describe the key takeaways...', modules: { toolbar: [['bold', 'italic', 'underline'], ['link', 'clean']] } });
+    videoDescEditor.on('text-change', () => { videoData.descriptionHTML = videoDescEditor.root.innerHTML; });
+
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    const thresholdValue = document.getElementById('thresholdValue');
+    thresholdSlider.addEventListener('input', () => { thresholdValue.textContent = thresholdSlider.value + '%'; });
+    
+    // Get checkboxes
+    const randomizeQuestionsCheckbox = document.getElementById('randomizeQuestions');
+    const randomizeOptionsCheckbox = document.getElementById('randomizeOptions');
+    const hideCorrectAnswersCheckbox = document.getElementById('hideCorrectAnswers');
+    const preventCopyPasteCheckbox = document.getElementById('preventCopyPaste');
+
+    // ==================== LOAD EXISTING COURSE DATA ====================
+    async function loadExistingCourseData() {
+      const id = getCourseIdFromUrl();
+      if (!id) return;
+      
+      try {
+        const response = await fetch(`api/get_course.php?id=${id}`);
+        const result = await response.json();
+        
+        if (result.success && result.course) {
+          courseId = result.course.id;
+          const course = result.course;
+          
+          if (course.video && course.video.video_url) {
+            document.getElementById('videoTitle').value = course.video.title || '';
+            videoDescEditor.root.innerHTML = course.video.description || '';
+            const fixedUrl = fixMediaUrl(course.video.video_url);
+            videoData.videoSource = fixedUrl;
+            videoData.externalUrl = fixedUrl;
+            displayVideoPreview(fixedUrl);
+            document.getElementById('uploadPlaceholder').classList.add('hidden');
+            document.getElementById('uploadReady').classList.remove('hidden');
+            document.getElementById('videoFileName').textContent = course.video.video_type === 'external' ? 'External video link' : 'Video loaded';
+          }
+          
+          if (course.quiz_settings) {
+            document.getElementById('globalMinutes').value = course.quiz_settings.global_timer_minutes || 10;
+            document.getElementById('globalSeconds').value = course.quiz_settings.global_timer_seconds || 0;
+            thresholdSlider.value = course.quiz_settings.passing_threshold || 70;
+            thresholdValue.textContent = thresholdSlider.value + '%';
+            
+            // Load settings from database
+            if (course.quiz_settings.randomize_questions !== undefined) {
+              randomizeQuestionsCheckbox.checked = course.quiz_settings.randomize_questions == 1;
+              randomizeOptionsCheckbox.checked = course.quiz_settings.randomize_options == 1;
+              hideCorrectAnswersCheckbox.checked = course.quiz_settings.hide_correct_answers == 1;
+              preventCopyPasteCheckbox.checked = course.quiz_settings.disable_copy == 1;
+            }
+          }
+          
+          if (course.quizzes && course.quizzes.length > 0) {
+            quizzes = course.quizzes.map(quiz => ({
+              id: genId('quiz'),
+              title: quiz.title,
+              questions: quiz.questions.map(q => ({
+                id: genId('q'),
+                type: q.type || 'mc',
+                text: q.text,
+                options: q.options.map(opt => ({
+                  id: genId('opt'),
+                  text: opt.text,
+                  correct: opt.is_correct === 1 || opt.correct === true
+                }))
+              }))
+            }));
+            renderQuizzes();
+          }
+          
+          window.showToast('Course loaded successfully');
+        }
+      } catch (error) {
+        console.error('Error loading course:', error);
+        window.showToast('Failed to load course data', 'error');
+      }
+    }
+
+    // ==================== VIDEO UPLOAD HANDLERS WITH CHUNKED UPLOAD ====================
+    const dropzone = document.getElementById('videoDropzone');
+    const videoInput = document.getElementById('videoFileInput');
+    const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+    const uploadReadyDiv = document.getElementById('uploadReady');
+    const videoFileNameSpan = document.getElementById('videoFileName');
+    const removeVideoBtn = document.getElementById('removeVideoBtn');
+    const videoPreviewArea = document.getElementById('videoPreviewArea');
+    const toggleExternalBtn = document.getElementById('toggleExternalBtn');
+    const externalPanel = document.getElementById('externalLinkPanel');
+    const externalUrlInput = document.getElementById('externalUrlInput');
+    const applyExternalBtn = document.getElementById('applyExternalBtn');
+    const uploadProgressContainer = document.getElementById('uploadProgressContainer');
+    const uploadProgressFill = document.getElementById('uploadProgressFill');
+    const uploadPercent = document.getElementById('uploadPercent');
+
+    function showUploadProgress() {
+      uploadProgressContainer.classList.remove('hidden');
+      uploadProgressFill.style.width = '0%';
+      uploadPercent.textContent = '0%';
+    }
+
+    function updateUploadProgress(percent) {
+      uploadProgressFill.style.width = percent + '%';
+      uploadPercent.textContent = percent + '%';
+    }
+
+    function hideUploadProgress() {
+      uploadProgressContainer.classList.add('hidden');
+    }
+
+    // Chunked upload for large video files
+    async function uploadVideoFileChunked(file) {
+      const CHUNK_SIZE = 512 * 1024; // 512KB chunks
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+      
+      showUploadProgress();
+      
+      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        const start = chunkIndex * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+        
+        const formData = new FormData();
+        formData.append('video_file', chunk);
+        formData.append('chunk_index', chunkIndex);
+        formData.append('total_chunks', totalChunks);
+        formData.append('file_name', file.name);
+        formData.append('file_size', file.size);
+        
+        try {
+          const response = await fetch('api/uploads.php', {
+            method: 'POST',
+            body: formData
+          });
+          
+          const result = await response.json();
+          
+          if (!result.success && !result.chunk) {
+            throw new Error(result.error || 'Upload failed');
+          }
+          
+          // Update progress
+          const percent = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+          updateUploadProgress(percent);
+          
+        } catch (error) {
+          console.error('Chunk upload failed:', error);
+          throw error;
+        }
+      }
+      
+      // Finalize - get the final URL
+      const finalFormData = new FormData();
+      finalFormData.append('chunk_index', totalChunks - 1);
+      finalFormData.append('total_chunks', totalChunks);
+      finalFormData.append('file_name', file.name);
+      finalFormData.append('file_size', file.size);
+      finalFormData.append('finalize', 'true');
+      
+      const finalResponse = await fetch('api/uploads.php', {
+        method: 'POST',
+        body: finalFormData
+      });
+      
+      const finalResult = await finalResponse.json();
+      
+      hideUploadProgress();
+      
+      if (finalResult.success && finalResult.url) {
+        return finalResult.url;
+      } else {
+        throw new Error('Failed to finalize upload');
+      }
+    }
+
+    // Regular upload for smaller files
+    async function uploadVideoFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('api/uploads.php', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (result.success) {
+        let url = result.url;
+        if (url && !url.startsWith('/')) {
+          url = '/' + url;
+        }
+        return fixMediaUrl(url);
+      }
+      throw new Error(result.error);
+    }
+
+    function clearVideoPreview() {
+      if (videoData.videoSource && !videoData.videoSource.startsWith('http')) URL.revokeObjectURL(videoData.videoSource);
+      videoData.videoFile = null; videoData.videoSource = null; videoData.externalUrl = "";
+      videoPreviewArea.innerHTML = `<span class="material-symbols-outlined text-5xl text-slate-300">movie</span><p class="absolute bottom-3 text-xs text-slate-400">No video selected</p>`;
+      uploadPlaceholder.classList.remove('hidden'); 
+      uploadReadyDiv.classList.add('hidden');
+      hideUploadProgress();
+    }
+    
+    function displayVideoPreview(src) {
+      let html = '';
+      if (src && (src.includes('youtube.com') || src.includes('youtu.be') || src.includes('vimeo.com'))) {
+        let embed = src.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/');
+        html = `<iframe class="w-full h-full" src="${embed}" frameborder="0" allowfullscreen></iframe>`;
+      } else if (src && (src.startsWith('blob:') || src.startsWith('/uploads/') || src.includes('/uploads/'))) {
+        const fixedSrc = fixMediaUrl(src);
+        html = `<video controls class="w-full h-full object-contain" src="${fixedSrc}"></video>`;
+      } else html = `<span class="material-symbols-outlined text-5xl">movie</span>`;
+      videoPreviewArea.innerHTML = html;
+    }
+    
+    async function handleVideoFile(file) {
+      if (!file) return;
+      
+      // Check file size (2GB limit)
+      if (file.size > 2 * 1024 * 1024 * 1024) {
+        window.showToast('File too large. Maximum 2GB allowed.', 'error');
+        return;
+      }
+      
+      try {
+        let url;
+        // Use chunked upload for files larger than 50MB
+        if (file.size > 50 * 1024 * 1024) {
+          window.showToast('Large file detected. Using chunked upload...', 'info');
+          url = await uploadVideoFileChunked(file);
+        } else {
+          window.showToast('Uploading video...', 'info');
+          url = await uploadVideoFile(file);
+        }
+        
+        videoData.videoFile = file; 
+        videoData.videoSource = url; 
+        videoData.externalUrl = "";
+        videoFileNameSpan.textContent = file.name;
+        uploadPlaceholder.classList.add('hidden'); 
+        uploadReadyDiv.classList.remove('hidden');
+        displayVideoPreview(url);
+        window.showToast('Video uploaded successfully');
+      } catch(error) {
+        window.showToast('Upload failed: ' + error.message, 'error');
+        hideUploadProgress();
+      }
+    }
+    
+    dropzone.addEventListener('click', () => videoInput.click());
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dropzone-active'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dropzone-active'));
+    dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('dropzone-active'); if (e.dataTransfer.files[0]) handleVideoFile(e.dataTransfer.files[0]); });
+    videoInput.addEventListener('change', e => { if(e.target.files.length) handleVideoFile(e.target.files[0]); });
+    removeVideoBtn.addEventListener('click', () => clearVideoPreview());
+    toggleExternalBtn.addEventListener('click', () => externalPanel.classList.toggle('hidden'));
+    applyExternalBtn.addEventListener('click', () => { 
+      let url = externalUrlInput.value.trim(); 
+      if(url) { 
+        clearVideoPreview(); 
+        const fixedUrl = fixMediaUrl(url);
+        videoData.videoSource = fixedUrl; 
+        videoData.externalUrl = fixedUrl; 
+        videoData.videoFile = null; 
+        uploadPlaceholder.classList.add('hidden'); 
+        uploadReadyDiv.classList.remove('hidden'); 
+        videoFileNameSpan.textContent = 'External video link'; 
+        displayVideoPreview(fixedUrl); 
+        externalPanel.classList.add('hidden'); 
+        window.showToast('External link applied'); 
+      } else window.showToast('Enter URL', 'warning'); 
+    });
+
+    // ==================== RENDER QUIZZES ====================
+    function renderQuizzes(scrollToNew = false, newQuizId = null) {
+      const container = document.getElementById('quizzesContainer');
+      const noMsg = document.getElementById('noQuizzesMsg');
+      if (!quizzes.length) { 
+        container.innerHTML = ''; 
+        noMsg.classList.remove('hidden'); 
+        return; 
+      }
+      noMsg.classList.add('hidden');
+      container.innerHTML = quizzes.map(quiz => `
+        <div class="quiz-card bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden" data-quiz-id="${quiz.id}">
+          <div class="p-6 border-b border-slate-100 bg-slate-50/60 flex flex-wrap justify-between items-center gap-3">
+            <input type="text" class="quiz-title-input text-xl font-bold bg-transparent border-0 focus:ring-0 p-0 outline-none text-slate-800" value="${escapeHtml(quiz.title)}" placeholder="Quiz title">
+            <div class="flex items-center gap-4">
+              <span class="text-sm text-slate-500 flex items-center gap-1"><span class="material-symbols-outlined text-sm">hourglass_top</span> Timer: <span class="font-mono font-bold text-blue-600">${getGlobalTimerFormatted()}</span></span>
+              <button class="delete-quiz-btn text-slate-400 hover:text-red-600 transition"><span class="material-symbols-outlined text-base">delete</span></button>
+            </div>
+          </div>
+          <div class="p-6 space-y-5">
+            <div class="flex justify-between items-center flex-wrap gap-3">
+              <h4 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Questions</h4>
+              <div class="flex gap-3">
+                <button class="add-mcq-btn text-sm bg-blue-100 px-4 py-2 rounded-full flex items-center gap-1 hover:bg-blue-200 transition font-medium"><span class="material-symbols-outlined text-sm">checklist</span> Multiple choice</button>
+                <button class="add-tf-btn text-sm bg-green-100 px-4 py-2 rounded-full flex items-center gap-1 hover:bg-green-200 transition font-medium"><span class="material-symbols-outlined text-sm">rule</span> True/False</button>
+              </div>
+            </div>
+            <div class="questions-list space-y-6">${renderQuestionsForQuiz(quiz)}</div>
+          </div>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.quiz-card').forEach(card => {
+        const qid = card.dataset.quizId;
+        const titleInput = card.querySelector('.quiz-title-input');
+        titleInput.addEventListener('change', (e) => { const q = quizzes.find(qq => qq.id == qid); if(q) q.title = e.target.value; });
+        card.querySelector('.delete-quiz-btn')?.addEventListener('click', () => { quizzes = quizzes.filter(q => q.id != qid); renderQuizzes(); window.showToast('Quiz deleted'); });
+        card.querySelector('.add-mcq-btn')?.addEventListener('click', () => addNewQuestion(qid, 'mc'));
+        card.querySelector('.add-tf-btn')?.addEventListener('click', () => addNewQuestion(qid, 'tf'));
+        
+        card.querySelectorAll('.add-option-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => { const questionId = btn.dataset.qid; const quizObj = quizzes.find(q => q.id == qid); const question = quizObj?.questions.find(q => q.id == questionId); if(question && question.type === 'mc') { question.options.push({ id: genId('opt'), text: 'New choice', correct: false }); renderQuizzes(); window.showToast('Option added'); } });
+        });
+        card.querySelectorAll('.del-question-btn').forEach(btn => {
+          btn.addEventListener('click', () => { const questionId = btn.dataset.qid; const quizObj = quizzes.find(q => q.id == qid); if(quizObj) { quizObj.questions = quizObj.questions.filter(q => q.id != questionId); renderQuizzes(); window.showToast('Question removed'); } });
+        });
+        card.querySelectorAll('.correct-radio').forEach(radio => {
+          radio.addEventListener('change', (e) => { if(!radio.checked) return; const questionId = radio.dataset.qid; const optId = radio.dataset.optid; const quizObj = quizzes.find(q => q.id == qid); const question = quizObj?.questions.find(q => q.id == questionId); if(question && question.type === 'mc') { question.options.forEach(opt => { opt.correct = (opt.id == optId); }); renderQuizzes(); } });
+        });
+        card.querySelectorAll('.opt-text-input').forEach(optInp => {
+          optInp.addEventListener('change', (e) => { const questionId = optInp.dataset.qid; const optId = optInp.dataset.optid; const quizObj = quizzes.find(q => q.id == qid); const question = quizObj?.questions.find(q => q.id == questionId); if(question) { const opt = question.options.find(o => o.id == optId); if(opt) opt.text = e.target.value; } });
+        });
+        card.querySelectorAll('.delete-opt-btn').forEach(del => {
+          del.addEventListener('click', (e) => { const questionId = del.dataset.qid; const optId = del.dataset.optid; const quizObj = quizzes.find(q => q.id == qid); const question = quizObj?.questions.find(q => q.id == questionId); if(question && question.type === 'mc' && question.options.length > 2) { question.options = question.options.filter(o => o.id != optId); renderQuizzes(); window.showToast('Option deleted'); } else if(question && question.options.length <= 2) window.showToast('Keep at least 2 options', 'warning'); });
+        });
+        card.querySelectorAll('.mc-question-text-input').forEach(inp => {
+          inp.addEventListener('change', (e) => { const questionId = inp.dataset.qid; const quizObj = quizzes.find(q => q.id == qid); const q = quizObj?.questions.find(q => q.id == questionId); if(q) q.text = e.target.value; });
+        });
+        card.querySelectorAll('.tf-correct-radio').forEach(radio => {
+          radio.addEventListener('change', (e) => { if(!radio.checked) return; const questionId = radio.dataset.qid; const selectedValue = radio.dataset.value;
+            const quizObj = quizzes.find(q => q.id == qid); const question = quizObj?.questions.find(q => q.id == questionId);
+            if(question && question.type === 'tf') { question.options.forEach(opt => { opt.correct = (opt.text === selectedValue); }); renderQuizzes(); }
+          });
+        });
+        card.querySelectorAll('.tf-question-text-input').forEach(inp => {
+          inp.addEventListener('change', (e) => { const questionId = inp.dataset.qid; const quizObj = quizzes.find(q => q.id == qid); const q = quizObj?.questions.find(q => q.id == questionId); if(q) q.text = e.target.value; });
+        });
+      });
+
+      if (scrollToNew && newQuizId) {
+        setTimeout(() => {
+          const newCard = document.querySelector(`.quiz-card[data-quiz-id="${newQuizId}"]`);
+          if (newCard) {
+            newCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            newCard.classList.add('ring-2', 'ring-green-400', 'shadow-lg');
+            setTimeout(() => newCard.classList.remove('ring-2', 'ring-green-400', 'shadow-lg'), 2000);
+          }
+        }, 100);
+      }
+    }
+
+    function renderQuestionsForQuiz(quiz) {
+      if (!quiz.questions.length) return '<div class="text-center text-slate-400 text-sm py-8 bg-slate-50 rounded-xl">No questions yet. Click "Multiple choice" or "True/False" above to add.</div>';
+      return quiz.questions.map(q => {
+        if (q.type === 'mc') {
+          const correctOptId = q.options.find(opt => opt.correct)?.id;
+          return `<div class="border border-slate-200 rounded-xl p-5 bg-white shadow-sm">
+            <div class="flex justify-between items-start gap-3 mb-4">
+              <div class="flex-1">
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">📝 Question</label>
+                <input type="text" data-qid="${q.id}" class="mc-question-text-input w-full text-base font-medium border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-blue-500/20" value="${escapeHtml(q.text)}" placeholder="e.g., What is the capital of France?">
+              </div>
+              <button class="del-question-btn text-red-400 hover:text-red-600 mt-6"><span class="material-symbols-outlined text-base">delete</span></button>
+            </div>
+            <div class="space-y-2 mt-2">
+              ${q.options.map(opt => `
+                <div class="option-row ${opt.id === correctOptId ? 'correct-highlight' : ''}">
+                  <input type="radio" name="correct_${q.id}" data-qid="${q.id}" data-optid="${opt.id}" class="correct-radio" ${opt.correct ? 'checked' : ''}>
+                  <input type="text" data-qid="${q.id}" data-optid="${opt.id}" class="opt-text-input flex-1 border-0 bg-transparent p-2 text-base focus:ring-0 outline-none" value="${escapeHtml(opt.text)}" placeholder="Choice text">
+                  <button class="delete-opt-btn text-slate-400 hover:text-red-500"><span class="material-symbols-outlined text-base">close</span></button>
+                </div>
+              `).join('')}
+            </div>
+            <div class="mt-4 flex justify-start">
+              <button type="button" class="add-option-btn" data-qid="${q.id}"><span class="material-symbols-outlined text-sm">add</span> Add another choice</button>
+            </div>
+            <p class="text-xs text-slate-400 mt-3">✓ The correct answer row turns <span class="text-green-600 font-medium">green</span>. Click the radio button to mark correct.</p>
+          </div>`;
+        } 
+        else if (q.type === 'tf') {
+          const trueCorrect = q.options.find(o => o.text === 'True')?.correct || false;
+          const falseCorrect = q.options.find(o => o.text === 'False')?.correct || false;
+          return `<div class="border border-slate-200 rounded-xl p-5 bg-white shadow-sm">
+            <div class="flex justify-between items-start gap-3 mb-4">
+              <div class="flex-1">
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">📌 Statement</label>
+                <input type="text" data-qid="${q.id}" class="tf-question-text-input w-full text-base font-medium border border-slate-200 rounded-xl p-3 bg-yellow-50" value="${escapeHtml(q.text)}" placeholder="e.g., The Earth is flat.">
+              </div>
+              <button class="del-question-btn text-red-400 hover:text-red-600 mt-6"><span class="material-symbols-outlined text-base">delete</span></button>
+            </div>
+            <div class="flex flex-wrap gap-4 mt-2">
+              <label class="flex items-center gap-3 cursor-pointer p-3 rounded-full ${trueCorrect ? 'bg-green-100 border border-green-400' : 'bg-slate-50 border border-slate-200'} transition">
+                <input type="radio" name="tf_${q.id}" data-qid="${q.id}" data-value="True" class="tf-correct-radio w-5 h-5" ${trueCorrect ? 'checked' : ''}> 
+                <span class="text-base font-medium">True</span>
+              </label>
+              <label class="flex items-center gap-3 cursor-pointer p-3 rounded-full ${falseCorrect ? 'bg-green-100 border border-green-400' : 'bg-slate-50 border border-slate-200'} transition">
+                <input type="radio" name="tf_${q.id}" data-qid="${q.id}" data-value="False" class="tf-correct-radio w-5 h-5" ${falseCorrect ? 'checked' : ''}> 
+                <span class="text-base font-medium">False</span>
+              </label>
+            </div>
+            <p class="text-xs text-slate-400 mt-4">⭐ The selected correct answer (True/False) will be highlighted in green.</p>
+          </div>`;
+        }
+        return '';
+      }).join('');
+    }
+
+    function addNewQuestion(quizId, type) {
+      const quiz = quizzes.find(q => q.id == quizId);
+      if (!quiz) return;
+      const qid = genId('q');
+      if (type === 'mc') {
+        quiz.questions.push({
+          id: qid, type: 'mc', text: 'New multiple choice question',
+          options: [{ id: genId('opt'), text: 'Option 1', correct: true }, { id: genId('opt'), text: 'Option 2', correct: false }]
+        });
+      } else if (type === 'tf') {
+        quiz.questions.push({
+          id: qid, type: 'tf', text: 'New true/false statement',
+          options: [{ id: genId('opt'), text: 'True', correct: true }, { id: genId('opt'), text: 'False', correct: false }]
+        });
+      }
+      renderQuizzes();
+      window.showToast(`${type === 'mc' ? 'Multiple choice' : 'True/False'} question added`);
+    }
+
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
+    function getGlobalTimerFormatted() { const mins = parseInt(document.getElementById('globalMinutes').value)||0; const secs = parseInt(document.getElementById('globalSeconds').value)||0; return `${mins}:${secs.toString().padStart(2,'0')}`; }
+
+    const addQuizZone = document.getElementById('addQuizZone');
+    addQuizZone.addEventListener('click', () => {
+      const newId = genId('quiz');
+      quizzes.push({ id: newId, title: `Quiz ${quizzes.length+1}`, questions: [] });
+      renderQuizzes(true, newId);
+      window.showToast('New quiz added — automatically scrolled into view');
+    });
+
+// ==================== SAVE FUNCTIONS ====================
+async function saveFullCourse(status = 'draft') {
+  if (!courseId) {
+    window.showToast('No course found. Please complete Step 1 first.', 'error');
+    return { success: false };
+  }
+  
+  let videoUrl = videoData.videoSource || '';
+  videoUrl = getRelativePathForSave(videoUrl);
+  
+  // Get timer values - FIXED
+  let minutesInput = document.getElementById('globalMinutes');
+  let secondsInput = document.getElementById('globalSeconds');
+  
+  let minutes = minutesInput ? parseInt(minutesInput.value) : 0;
+  let seconds = secondsInput ? parseInt(secondsInput.value) : 0;
+  
+  // Validate timer values
+  if (isNaN(minutes)) minutes = 0;
+  if (isNaN(seconds)) seconds = 0;
+  
+  // Log the values being sent
+  console.log('Saving timer values - Minutes:', minutes, 'Seconds:', seconds);
+  
+  const courseData = {
+    course_id: courseId,
+    video: {
+      title: document.getElementById('videoTitle').value,
+      description: videoDescEditor.root.innerHTML,
+      video_url: videoUrl,
+      video_type: videoData.externalUrl ? 'external' : 'upload'
+    },
+    quiz_settings: {
+      global_timer_minutes: minutes,
+      global_timer_seconds: seconds,
+      passing_threshold: parseInt(thresholdSlider.value) || 70,
+      randomize_questions: randomizeQuestionsCheckbox.checked ? 1 : 0,
+      randomize_options: randomizeOptionsCheckbox.checked ? 1 : 0,
+      hide_correct_answers: hideCorrectAnswersCheckbox.checked ? 1 : 0,
+      disable_copy: preventCopyPasteCheckbox.checked ? 1 : 0
+    },
+    quizzes: quizzes.map(quiz => ({
+      title: quiz.title,
+      questions: quiz.questions.map(q => ({
+        type: q.type,
+        text: q.text,
+        options: q.options.map(opt => ({
+          text: opt.text,
+          correct: opt.correct
+        }))
+      }))
+    }))
+  };
+  
+  console.log('Saving Step 2 data:', courseData);
+  console.log('Timer being saved:', courseData.quiz_settings.global_timer_minutes, 'min', courseData.quiz_settings.global_timer_seconds, 'sec');
+
+  try {
+    const response = await fetch('api/save_step2.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(courseData)
+    });
+    const result = await response.json();
+    if (result.success) {
+      window.showToast(`Course ${status === 'published' ? 'published' : 'saved'} successfully!`);
+      return { success: true, course_id: courseId };
+    } else {
+      window.showToast(result.error, 'error');
+      return { success: false };
+    }
+  } catch(error) {
+    window.showToast('Failed to save course: ' + error.message, 'error');
+    return { success: false };
+  }
+}
+
+    window.saveStep2 = async function() { 
+      return await saveFullCourse('draft');
+    };
+
+    // ==================== INITIALIZE ====================
+    function initFooter() {
+      updateStepIndicator();
+
+      const backBtn = document.getElementById('footerBackBtn');
+      const saveDraftBtn = document.getElementById('saveDraftFooter');
+      const saveContinueBtn = document.getElementById('saveContinue');
+
+      if (backBtn) {
+        const newBackBtn = backBtn.cloneNode(true);
+        backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+        newBackBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const step = getCurrentStepFromPage();
+          if (step === 2) navigateToStep('step1.html');
+          else if (step === 3) navigateToStep('step2.html');
+          else window.history.back();
+        });
+      }
+
+      if (saveDraftBtn) {
+        const newSaveDraftBtn = saveDraftBtn.cloneNode(true);
+        saveDraftBtn.parentNode.replaceChild(newSaveDraftBtn, saveDraftBtn);
+        newSaveDraftBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const originalText = newSaveDraftBtn.innerHTML;
+          setButtonLoading(newSaveDraftBtn, true, originalText);
+          if (typeof window.saveStep2 === 'function') {
+            try {
+              await window.saveStep2();
+              if (typeof window.showToast === 'function') window.showToast('Draft saved successfully!');
+            } catch (error) {
+              if (typeof window.showToast === 'function') window.showToast('Failed to save draft: ' + error.message, 'error');
+            }
+          }
+          setButtonLoading(newSaveDraftBtn, false, originalText);
+        });
+      }
+
+      if (saveContinueBtn) {
+        const newSaveContinueBtn = saveContinueBtn.cloneNode(true);
+        saveContinueBtn.parentNode.replaceChild(newSaveContinueBtn, saveContinueBtn);
+        newSaveContinueBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const step = getCurrentStepFromPage();
+          const originalText = newSaveContinueBtn.innerHTML;
+          
+          if (step === 2) {
+            setButtonLoading(newSaveContinueBtn, true, originalText);
+            try {
+              if (typeof window.saveStep2 === 'function') {
+                const result = await window.saveStep2();
+                const courseId = result?.course_id || getCourseIdFromUrl();
+                if (courseId) {
+                  window.location.href = `step3.html?id=${courseId}`;
+                } else {
+                  window.location.href = 'step3.html';
+                }
+              } else {
+                navigateToStep('step3.html');
+              }
+            } catch (error) {
+              setButtonLoading(newSaveContinueBtn, false, originalText);
+              if (typeof window.showToast === 'function') window.showToast('Error saving: ' + error.message, 'error');
+            }
+          }
+        });
+      }
+    }
+
+    // ==================== HEADER NAVIGATION ====================
+    document.addEventListener('DOMContentLoaded', function() {
+      initFooter();
+      
+      const step1Container = document.getElementById('step1-container');
+      const step2Container = document.getElementById('step2-container');
+      const step3Container = document.getElementById('step3-container');
+      
+      if (step1Container) {
+        step1Container.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const currentStep = getCurrentStepFromPage();
+          if (currentStep === 1) return;
+          if (await isStepAccessible(1)) navigateToStep('step1.html');
+        });
+      }
+      
+      if (step2Container) {
+        step2Container.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const currentStep = getCurrentStepFromPage();
+          if (currentStep === 2) return;
+          if (await isStepAccessible(2)) navigateToStep('step2.html');
+        });
+      }
+      
+      if (step3Container) {
+        step3Container.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const currentStep = getCurrentStepFromPage();
+          if (currentStep === 3) return;
+          if (await isStepAccessible(3)) navigateToStep('step3.html');
+        });
+      }
+    });
+
+    // Initialize
+    videoDescEditor.root.innerHTML = "<p>Watch the video, then take the quizzes.</p>";
+    document.getElementById('videoTitle').value = "Essential Tutorial";
+    loadExistingCourseData();
+    renderQuizzes();
+  </script>
+</body>
+</html>

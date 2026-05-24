@@ -1,0 +1,16 @@
+# Increase upload limits
+php_value upload_max_filesize 2G
+php_value post_max_size 2G
+php_value max_execution_time 3600
+php_value max_input_time 3600
+php_value memory_limit 512M
+php_value max_file_uploads 20
+
+# Allow large file uploads
+LimitRequestBody 0
+
+# Enable mod_rewrite
+RewriteEngine On
+
+# Set max input vars
+php_value max_input_vars 5000

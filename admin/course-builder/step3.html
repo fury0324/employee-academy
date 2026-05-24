@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>Review & Publish · UpStaff Course Builder</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0,1" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: { brand: { light: '#f0f4ff', DEFAULT: '#2563eb', dark: '#1e40af' } },
+          borderRadius: { 'xl': '0.75rem', '2xl': '1rem', '3xl': '1.5rem' }
+        }
+      }
+    }
+  </script>
+  <style>
+    *:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+    .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 8px; }
+    @keyframes scaleIn { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .animate-scale-in { animation: scaleIn .4s cubic-bezier(.34, 1.56, .64, 1) forwards; }
+    .animate-slide-up { animation: slideUp .4s ease forwards; }
+    @keyframes confetti-fall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+    .confetti-piece { position: fixed; width: 8px; height: 8px; border-radius: 2px; animation: confetti-fall linear forwards; pointer-events: none; z-index: 200; }
+    .step-active { background-color: #2563eb; color: white; border-color: #2563eb; }
+    .step-completed { background-color: #10b981; color: white; border-color: #10b981; }
+    .step-inactive { background-color: white; color: #64748b; border-color: #e2e8f0; }
+    .step-clickable { cursor: pointer; transition: all 0.2s ease; }
+    .step-clickable:hover { transform: translateY(-2px); filter: brightness(0.95); }
+    .quiz-preview-card { transition: all 0.2s ease; }
+    .quiz-preview-card:hover { transform: translateX(4px); background-color: #f8fafc; }
+  </style>
+</head>
+
+<body class="bg-slate-50 font-sans text-slate-800 min-h-screen">
+
+  <!-- HEADER SECTION (same as step2) -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-20 w-full shadow-sm">
+    <div class="w-full px-4 sm:px-6 md:px-8 lg:px-12 py-4">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-2xl text-blue-600">school</span>
+          <span class="text-lg font-bold text-slate-800">UpStaff</span>
+          <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full ml-2">Admin</span>
+        </div>
+        <div class="text-xs text-slate-400 hidden sm:block">Course Builder</div>
+      </div>
+      
+      <div class="relative mt-2">
+        <div class="absolute top-5 left-0 w-full h-0.5 bg-slate-200 hidden sm:block"></div>
+        <div class="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
+          <div class="flex items-center gap-3 sm:flex-1 step-clickable" id="step1-container">
+            <div class="relative z-10">
+              <div id="step1-circle" class="step-completed w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all">
+                <span class="material-symbols-outlined text-sm">check</span>
+              </div>
+            </div>
+            <div class="sm:flex-1">
+              <p class="text-sm font-semibold text-green-700">Step 1</p>
+              <p class="text-xs text-slate-500">Basic Info</p>
+            </div>
+            <div class="hidden sm:block flex-1 h-0.5 bg-slate-200"></div>
+          </div>
+
+          <div class="flex items-center gap-3 sm:flex-1 step-clickable" id="step2-container">
+            <div class="relative z-10">
+              <div id="step2-circle" class="step-completed w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all">
+                <span class="material-symbols-outlined text-sm">check</span>
+              </div>
+            </div>
+            <div class="sm:flex-1">
+              <p class="text-sm font-semibold text-green-700">Step 2</p>
+              <p class="text-xs text-slate-500">Quizzes</p>
+            </div>
+            <div class="hidden sm:block flex-1 h-0.5 bg-slate-200"></div>
+          </div>
+
+          <div class="flex items-center gap-3 sm:flex-1 step-clickable" id="step3-container">
+            <div class="relative z-10">
+              <div id="step3-circle" class="step-active w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all">
+                <span class="material-symbols-outlined text-sm">checklist</span>
+              </div>
+            </div>
+            <div class="sm:flex-1">
+              <p class="text-sm font-semibold text-blue-700">Step 3</p>
+              <p class="text-xs text-slate-500">Review & Publish</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 flex items-center gap-3">
+        <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div id="progressFill" class="h-full bg-blue-600 rounded-full transition-all duration-300" style="width: 100%"></div>
+        </div>
+        <span id="progressPercent" class="text-xs font-medium text-slate-500">100% complete</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="w-full px-4 sm:px-6 md:px-8 lg:px-12 py-8 pb-32">
+    <div class="mb-8">
+      <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Review & Publish</h2>
+      <p class="mt-1 text-sm text-slate-500">Double-check your course details and curriculum before going live.</p>
+    </div>
+
+    <div id="loadingIndicator" class="text-center py-12">
+      <div class="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow">
+        <span class="material-symbols-outlined animate-spin">progress_activity</span>
+        <span>Loading course data...</span>
+      </div>
+    </div>
+
+    <div id="courseContent" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <!-- LEFT: Course Preview -->
+      <div class="lg:col-span-5 space-y-6">
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
+          <span class="material-symbols-outlined text-base">visibility</span> Course Preview
+        </h3>
+        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition">
+          <div id="previewThumbnail" class="w-full aspect-video bg-gradient-to-br from-blue-500 to-indigo-700 flex items-center justify-center relative">
+            <img id="thumbnailImage" src="" alt="Course thumbnail" class="w-full h-full object-cover hidden">
+            <span id="thumbnailPlaceholder" class="material-symbols-outlined text-6xl text-white/30">menu_book</span>
+          </div>
+          <div class="p-6">
+            <div class="flex items-center gap-2 mb-3 flex-wrap">
+              <span id="previewCategory" class="inline-block px-3 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-medium uppercase tracking-wider">General</span>
+              <span id="previewDifficulty" class="inline-block px-3 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-medium uppercase tracking-wider">Beginner</span>
+              <span id="previewStatus" class="inline-block px-3 py-1 rounded-lg bg-amber-50 text-amber-600 text-[10px] font-medium uppercase tracking-wider">Draft</span>
+            </div>
+            <h4 id="previewTitle" class="text-xl font-bold text-slate-800 mb-2">Untitled Course</h4>
+            <p id="previewDescription" class="text-sm text-slate-500 mb-4 line-clamp-3">No description provided.</p>
+            <div class="flex items-center justify-between border-t border-slate-100 pt-4 gap-4 flex-wrap">
+              <div class="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <span class="material-symbols-outlined text-base">smart_display</span>
+                <span id="previewVideoStatus">No video</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <span class="material-symbols-outlined text-base">quiz</span>
+                <span id="previewQuizCount">0 quizzes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <button id="editStep1Btn" class="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 bg-white hover:bg-slate-50 hover:border-blue-300 transition flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-base">edit</span> Edit Basics
+          </button>
+          <button id="editStep2Btn" class="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 bg-white hover:bg-slate-50 hover:border-blue-300 transition flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-base">menu_book</span> Edit Quizzes
+          </button>
+        </div>
+      </div>
+
+      <!-- RIGHT: Checklist and Quizzes Preview -->
+      <div class="lg:col-span-7 space-y-6">
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
+          <span class="material-symbols-outlined text-base">fact_check</span> Submission Checklist
+        </h3>
+        
+        <!-- Basic Info Check -->
+        <div id="checkBasicInfo" class="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm flex items-start justify-between hover:border-blue-200 transition">
+          <div class="flex gap-4">
+            <div id="checkBasicInfoIcon" class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">
+              <span class="material-symbols-outlined text-xl">check_circle</span>
+            </div>
+            <div>
+              <h4 class="font-semibold text-slate-800">Basic Information</h4>
+              <p class="text-xs text-slate-400 mt-0.5 uppercase font-medium tracking-wider">Title, Category, Description</p>
+              <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2" id="checkBasicInfoDetails"></div>
+            </div>
+          </div>
+          <button id="editBasicsBtn" class="text-blue-600 text-xs font-medium uppercase tracking-wider hover:underline shrink-0">Edit</button>
+        </div>
+
+        <!-- Video Check -->
+        <div id="checkVideo" class="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm flex items-start justify-between hover:border-blue-200 transition">
+          <div class="flex gap-4">
+            <div id="checkVideoIcon" class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">
+              <span class="material-symbols-outlined text-xl">smart_display</span>
+            </div>
+            <div>
+              <h4 class="font-semibold text-slate-800">Core Video Lesson</h4>
+              <p class="text-xs text-slate-400 mt-0.5 uppercase font-medium tracking-wider" id="checkVideoSub">No video uploaded</p>
+            </div>
+          </div>
+          <button id="editVideoBtn" class="text-blue-600 text-xs font-medium uppercase tracking-wider hover:underline shrink-0">Edit</button>
+        </div>
+
+        <!-- Quizzes Check -->
+        <div id="checkQuizzes" class="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm hover:border-blue-200 transition">
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex gap-4">
+              <div id="checkQuizzesIcon" class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">
+                <span class="material-symbols-outlined text-xl">quiz</span>
+              </div>
+              <div>
+                <h4 class="font-semibold text-slate-800">Quizzes & Assessments</h4>
+                <p class="text-xs text-slate-400 mt-0.5 uppercase font-medium tracking-wider" id="checkQuizzesSub">No quizzes added</p>
+              </div>
+            </div>
+            <button id="editQuizzesBtn" class="text-blue-600 text-xs font-medium uppercase tracking-wider hover:underline shrink-0">Edit</button>
+          </div>
+          <div id="quizzesPreviewList" class="mt-4 space-y-2"></div>
+        </div>
+
+        <!-- Terms Check -->
+        <div class="p-5 rounded-2xl bg-blue-50/50 border border-blue-100 shadow-sm">
+          <div class="flex gap-3">
+            <div class="pt-0.5">
+              <input type="checkbox" id="termsCheck" class="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500/20 cursor-pointer">
+            </div>
+            <label for="termsCheck" class="text-sm text-slate-600 leading-relaxed cursor-pointer">
+              I confirm that I own the rights to all content uploaded and agree to the
+              <a href="#" class="text-blue-600 font-medium underline hover:no-underline">Instructor Terms of Service</a>
+              and
+              <a href="#" class="text-blue-600 font-medium underline hover:no-underline">Content Quality Standards</a>.
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="noCourseMessage" class="hidden text-center py-12 bg-white rounded-2xl border border-slate-200">
+      <span class="material-symbols-outlined text-6xl text-slate-300 mb-4">error</span>
+      <h3 class="text-xl font-semibold text-slate-700 mb-2">No Course Found</h3>
+      <p class="text-slate-500 mb-6">Please complete Step 1 and Step 2 first.</p>
+      <button onclick="window.location.href='step1.html'" class="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Go to Step 1</button>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-sm border-t border-slate-200 py-3 z-10">
+    <div class="w-full px-4 sm:px-6 md:px-8 lg:px-12 flex items-center justify-between">
+      <button id="footerBackBtn" class="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition">
+        <span class="material-symbols-outlined text-sm">arrow_back</span> Back
+      </button>
+      <div class="flex items-center gap-4">
+        <p id="stepIndicator" class="text-xs text-slate-400 hidden sm:block">Step 3 of 3 • Review & Publish</p>
+        <button id="publishBtn" class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow-sm shadow-blue-200 transition">
+          Publish Course <span class="material-symbols-outlined text-sm">rocket_launch</span>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- PUBLISH CONFIRM MODAL -->
+  <div id="publishModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md p-8 text-center">
+      <div class="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-5">
+        <span class="material-symbols-outlined text-3xl text-blue-600" style="font-variation-settings: 'FILL' 1">rocket_launch</span>
+      </div>
+      <h3 class="text-xl font-bold text-slate-800 mb-2">Ready to publish?</h3>
+      <p class="text-sm text-slate-500 mb-1">You're about to publish <strong id="confirmCourseTitle" class="text-slate-700 font-semibold"></strong>.</p>
+      <p class="text-sm text-slate-400 mb-7">This will make it visible to employees immediately.</p>
+      <div class="flex gap-3">
+        <button id="cancelPublishBtn" class="flex-1 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition">Cancel</button>
+        <button id="confirmPublishBtn" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined text-base">rocket_launch</span> Publish
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUCCESS SCREEN -->
+  <div id="successScreen" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
+    <div class="text-center max-w-md animate-slide-up bg-white rounded-2xl p-8 shadow-2xl mx-4">
+      <div class="w-24 h-24 rounded-full bg-white shadow-lg flex items-center justify-center mx-auto mb-6 animate-scale-in">
+        <span class="material-symbols-outlined text-5xl text-blue-600" style="font-variation-settings: 'FILL' 1">rocket_launch</span>
+      </div>
+      <h2 class="text-3xl font-bold text-slate-800 mb-3">Course Published! 🎉</h2>
+      <p class="text-slate-500 mb-2">Your course <strong id="successCourseTitle" class="text-slate-700"></strong> is now live.</p>
+      <p class="text-sm text-slate-400 mb-8">Employees can now enroll and start learning.</p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <button id="createAnotherBtn" class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition shadow-sm shadow-blue-200">
+          <span class="material-symbols-outlined text-base">add</span> Create Another Course
+        </button>
+        <button id="viewCoursesBtn" class="inline-flex items-center gap-2 px-6 py-3 border border-slate-200 bg-white text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition">
+          <span class="material-symbols-outlined text-base">dashboard</span> Go to Dashboard
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none"></div>
+
+  <script>
+    // ==================== GLOBAL VARIABLES ====================
+    let courseId = null;
+    let courseData = null;
+
+    const pathParts = window.location.pathname.split('/');
+    const basePath = pathParts.length > 1 && pathParts[1] !== 'step1.html' && pathParts[1] !== 'step2.html' && pathParts[1] !== 'step3.html' ? pathParts[1] : '';
+    const baseUrl = basePath ? `/${basePath}` : '';
+
+    function fixMediaUrl(url) {
+      if (!url || url === '') return '';
+      if (baseUrl && url.startsWith(baseUrl)) return url;
+      if (url.startsWith('/uploads/')) return baseUrl ? `${baseUrl}${url}` : url;
+      if (!url.startsWith('/') && !url.startsWith('http')) return baseUrl ? `${baseUrl}/uploads/${url}` : `/uploads/${url}`;
+      return url;
+    }
+
+    function showToast(msg, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const t = document.createElement('div');
+      const bg = type === 'error' ? 'bg-red-500' : type === 'warning' ? 'bg-amber-500' : 'bg-slate-800';
+      const icon = type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'check_circle';
+      t.className = `pointer-events-auto flex items-center gap-2 px-5 py-3 ${bg} text-white text-sm font-medium rounded-xl shadow-lg opacity-0 translate-y-2 transition-all duration-300`;
+      t.innerHTML = `<span class="material-symbols-outlined text-base">${icon}</span>${msg}`;
+      container.appendChild(t);
+      requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateY(0)'; });
+      setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    function getCourseIdFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('id');
+    }
+
+    async function loadCourseData() {
+      const loadingIndicator = document.getElementById('loadingIndicator');
+      const courseContent = document.getElementById('courseContent');
+      const noCourseMessage = document.getElementById('noCourseMessage');
+      
+      const courseIdParam = getCourseIdFromUrl();
+      
+      if (!courseIdParam) {
+        loadingIndicator.classList.add('hidden');
+        noCourseMessage.classList.remove('hidden');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`api/get_course.php?id=${courseIdParam}`);
+        const result = await response.json();
+        
+        if (result.success && result.course) {
+          courseData = result.course;
+          courseId = courseData.id;
+          
+          loadingIndicator.classList.add('hidden');
+          courseContent.classList.remove('hidden');
+          
+          displayCourseData(courseData);
+        } else {
+          loadingIndicator.classList.add('hidden');
+          noCourseMessage.classList.remove('hidden');
+          showToast(result.error || 'Course not found', 'error');
+        }
+      } catch (error) {
+        console.error('Error loading course:', error);
+        loadingIndicator.classList.add('hidden');
+        noCourseMessage.classList.remove('hidden');
+        showToast('Failed to load course data', 'error');
+      }
+    }
+
+    function displayCourseData(data) {
+      // Basic Info
+      document.getElementById('previewTitle').textContent = data.title || 'Untitled Course';
+      document.getElementById('previewCategory').textContent = data.category || 'General';
+      document.getElementById('previewDifficulty').textContent = data.difficulty || 'Beginner';
+      document.getElementById('previewStatus').textContent = data.status === 'published' ? 'Published' : 'Draft';
+      if (data.status === 'published') {
+        document.getElementById('previewStatus').className = 'inline-block px-3 py-1 rounded-lg bg-green-50 text-green-600 text-[10px] font-medium uppercase tracking-wider';
+      }
+      
+      // Description
+      let descriptionText = data.description || 'No description provided.';
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = descriptionText;
+      descriptionText = tempDiv.textContent || tempDiv.innerText || descriptionText;
+      document.getElementById('previewDescription').textContent = descriptionText.substring(0, 150) + (descriptionText.length > 150 ? '...' : '');
+      
+      // Thumbnail
+      if (data.thumbnail_url && data.thumbnail_url !== '') {
+        const fixedUrl = fixMediaUrl(data.thumbnail_url);
+        const thumbnailImg = document.getElementById('thumbnailImage');
+        thumbnailImg.src = fixedUrl;
+        thumbnailImg.classList.remove('hidden');
+        document.getElementById('thumbnailPlaceholder').classList.add('hidden');
+      }
+      
+      // Video Status
+      const hasVideo = data.video && data.video.video_url && data.video.video_url !== '';
+      document.getElementById('previewVideoStatus').innerHTML = hasVideo ? 
+        '<span class="text-green-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">check_circle</span> Video uploaded</span>' : 
+        '<span class="text-amber-600 flex items-center gap-1"><span class="material-symbols-outlined text-sm">warning</span> No video</span>';
+      
+      // Quiz Count
+      const quizCount = data.quizzes?.length || 0;
+      document.getElementById('previewQuizCount').textContent = `${quizCount} quiz${quizCount !== 1 ? 'zes' : ''}`;
+      
+      // Checklist - Basic Info
+      const hasTitle = !!(data.title && data.title.trim());
+      const hasDesc = !!(data.description && data.description.trim() && data.description !== '<p><br></p>');
+      const basicOk = hasTitle && hasDesc && !!data.category;
+      styleCheckItem('checkBasicInfoIcon', basicOk, 'check_circle');
+      
+      const basicDetails = document.getElementById('checkBasicInfoDetails');
+      basicDetails.innerHTML = `
+        <span class="flex items-center gap-1 text-xs ${hasTitle ? 'text-slate-500' : 'text-amber-500'}">
+          <span class="material-symbols-outlined ${hasTitle ? 'text-green-500' : 'text-amber-400'} text-sm">${hasTitle ? 'done' : 'warning'}</span>
+          Title: ${hasTitle ? data.title : 'Missing'}
+        </span>
+        <span class="flex items-center gap-1 text-xs ${hasDesc ? 'text-slate-500' : 'text-amber-500'}">
+          <span class="material-symbols-outlined ${hasDesc ? 'text-green-500' : 'text-amber-400'} text-sm">${hasDesc ? 'done' : 'warning'}</span>
+          Description: ${hasDesc ? 'Written' : 'Missing'}
+        </span>
+        <span class="flex items-center gap-1 text-xs ${data.category ? 'text-slate-500' : 'text-amber-500'}">
+          <span class="material-symbols-outlined ${data.category ? 'text-green-500' : 'text-amber-400'} text-sm">${data.category ? 'done' : 'warning'}</span>
+          Category: ${data.category || 'Not selected'}
+        </span>
+      `;
+      
+      // Checklist - Video
+      styleCheckItem('checkVideoIcon', hasVideo, hasVideo ? 'smart_display' : 'videocam_off');
+      document.getElementById('checkVideoSub').innerHTML = hasVideo ? 
+        `<span class="text-green-600">✓ ${data.video?.title || 'Video uploaded'}</span>` : 
+        '<span class="text-amber-600">⚠ No video uploaded yet</span>';
+      
+      // Checklist - Quizzes
+      const hasQuizzes = quizCount > 0;
+      styleCheckItem('checkQuizzesIcon', hasQuizzes, hasQuizzes ? 'quiz' : 'help');
+      document.getElementById('checkQuizzesSub').innerHTML = hasQuizzes ? 
+        `<span class="text-green-600">✓ ${quizCount} quiz${quizCount !== 1 ? 'zes' : ''} added</span>` : 
+        '<span class="text-amber-600">⚠ No quizzes added yet</span>';
+      
+      // Display quizzes preview
+      const quizzesList = document.getElementById('quizzesPreviewList');
+      if (data.quizzes && data.quizzes.length > 0) {
+        quizzesList.innerHTML = data.quizzes.map(quiz => `
+          <div class="quiz-preview-card p-3 rounded-xl bg-slate-50 border border-slate-100">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm text-blue-500">quiz</span>
+                <span class="text-sm font-medium text-slate-700">${escapeHtml(quiz.title)}</span>
+              </div>
+              <span class="text-xs text-slate-400">${quiz.questions?.length || 0} questions</span>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        quizzesList.innerHTML = '<p class="text-sm text-slate-400 italic">No quizzes created yet.</p>';
+      }
+    }
+
+    function styleCheckItem(iconId, isOk, iconName) {
+      const wrap = document.getElementById(iconId);
+      if (!wrap) return;
+      if (isOk) {
+        wrap.className = 'bg-green-100 text-green-600 w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0';
+        wrap.innerHTML = '<span class="material-symbols-outlined text-xl" style="font-variation-settings: \'FILL\' 1">check_circle</span>';
+      } else {
+        wrap.className = 'bg-amber-100 text-amber-600 w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0';
+        wrap.innerHTML = `<span class="material-symbols-outlined text-xl">${iconName || 'warning'}</span>`;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
+    }
+
+    async function publishCourse() {
+      if (!document.getElementById('termsCheck').checked) {
+        showToast('Please accept the terms before publishing', 'warning');
+        return;
+      }
+      
+      if (!courseId) {
+        showToast('No course found to publish', 'error');
+        return;
+      }
+      
+      document.getElementById('confirmCourseTitle').textContent = `"${courseData?.title || 'Untitled Course'}"`;
+      document.getElementById('publishModal').classList.remove('hidden');
+    }
+
+    async function confirmPublish() {
+      document.getElementById('publishModal').classList.add('hidden');
+      const btn = document.getElementById('confirmPublishBtn');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">progress_activity</span> Publishing...';
+      
+      try {
+        const updateData = { course_id: courseId, status: 'published' };
+        const response = await fetch('api/publish_course.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData)
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          document.getElementById('successCourseTitle').textContent = `"${courseData?.title || 'Untitled Course'}"`;
+          document.querySelector('main').classList.add('hidden');
+          document.querySelector('footer').classList.add('hidden');
+          document.getElementById('successScreen').classList.remove('hidden');
+          launchConfetti();
+        } else {
+          showToast(result.error || 'Failed to publish course', 'error');
+        }
+      } catch (error) {
+        showToast('Failed to publish: ' + error.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    function launchConfetti() {
+      const colors = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0891b2'];
+      for (let i = 0; i < 80; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = Math.random() * 100 + 'vw';
+        piece.style.top = '-10px';
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.animationDuration = (Math.random() * 2 + 1.5) + 's';
+        piece.style.animationDelay = (Math.random() * 0.8) + 's';
+        piece.style.width = (Math.random() * 8 + 4) + 'px';
+        piece.style.height = (Math.random() * 8 + 4) + 'px';
+        document.body.appendChild(piece);
+        setTimeout(() => piece.remove(), 4000);
+      }
+    }
+
+    // Navigation
+    function goToStep(step) {
+      const courseIdParam = getCourseIdFromUrl();
+      const url = courseIdParam ? `${step}.html?id=${courseIdParam}` : `${step}.html`;
+      window.location.href = url;
+    }
+
+    // Event Listeners
+    document.getElementById('footerBackBtn')?.addEventListener('click', () => goToStep('step2'));
+    document.getElementById('publishBtn')?.addEventListener('click', publishCourse);
+    document.getElementById('cancelPublishBtn')?.addEventListener('click', () => document.getElementById('publishModal').classList.add('hidden'));
+    document.getElementById('confirmPublishBtn')?.addEventListener('click', confirmPublish);
+    
+    document.getElementById('editStep1Btn')?.addEventListener('click', () => goToStep('step1'));
+    document.getElementById('editStep2Btn')?.addEventListener('click', () => goToStep('step2'));
+    document.getElementById('editBasicsBtn')?.addEventListener('click', () => goToStep('step1'));
+    document.getElementById('editVideoBtn')?.addEventListener('click', () => goToStep('step2'));
+    document.getElementById('editQuizzesBtn')?.addEventListener('click', () => goToStep('step2'));
+    
+    document.getElementById('step1-container')?.addEventListener('click', () => goToStep('step1'));
+    document.getElementById('step2-container')?.addEventListener('click', () => goToStep('step2'));
+    
+    document.getElementById('createAnotherBtn')?.addEventListener('click', () => window.location.href = 'step1.html');
+    document.getElementById('viewCoursesBtn')?.addEventListener('click', () => window.location.href = '../course_management.php');
+    
+    document.getElementById('publishModal')?.addEventListener('click', (e) => {
+      if (e.target === document.getElementById('publishModal')) {
+        document.getElementById('publishModal').classList.add('hidden');
+      }
+    });
+    
+    document.getElementById('termsCheck').checked = false;
+    
+    // Initialize
+    loadCourseData();
+  </script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<nav class="fixed top-0 left-0 right-0 z-50 border-b border-black/10 bg-white backdrop-blur-sm">
+  <div class="relative px-4 py-2.5 flex items-center md:px-10">
+
+    <!-- Logo -->
+    <div class="flex items-center gap-1">
+      <img src="assets/logo/upstaff.png" class="w-10 h-10 md:w-14 md:h-14 cursor-pointer">
+
+      <div class="flex flex-col leading-none hidden md:flex">
+        <span class="tracking-wide font-black text-3xl font-open">upstaff</span>
+        <span class="text-sm text-sky tracking-wide self-end -mt-1 font-medium">
+          academy
+        </span>
+      </div>
+    </div>
+
+    <!-- Desktop Nav -->
+    <div class="hidden md:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
+      <a href="#features" class="text-base text-ash/90 hover:text-sky">Features</a>
+      <a href="#tools" class="text-base text-ash/90 hover:text-sky">Course Library</a>
+      <a href="#about" class="text-base text-ash/90 hover:text-sky">About</a>
+    </div>
+
+ <!-- Desktop CTA -->
+<div class="ml-auto hidden md:flex">
+  <a href="../upstaff/login/login.php">
+    <button class="text-base py-3 px-8 font-semibold bg-void-elevated text-parchment rounded-lg hover:bg-void-elevated/90 cursor-pointer">
+      Login
+    </button>
+  </a>
+</div>
+
+    <!-- Mobile Toggle Button -->
+    <button id="menuBtn" class="md:hidden ml-auto p-2 rounded-lg hover:bg-gray-100 cursor-pointer">
+      <img src="assets/icons/menu.svg" class="w-6 h-6 invert">
+    </button>
+
+  </div>
+
+  <!-- Mobile Menu -->
+  <div id="mobileMenu" class="hidden md:hidden bg-white shadow-lg rounded-b-xl border-t border-black/10 overflow-hidden">
+    <div class="flex flex-col px-4 py-3 space-y-2">
+      <a href="#features" class="block px-3 py-2 rounded-lg text-ash/90 hover:bg-sky/10 hover:text-sky transition-colors">Features</a>
+      <a href="#tools" class="block px-3 py-2 rounded-lg text-ash/90 hover:bg-sky/10 hover:text-sky transition-colors">Course Library</a>
+      <a href="#about" class="block px-3 py-2 rounded-lg text-ash/90 hover:bg-sky/10 hover:text-sky transition-colors">About</a>
+
+      <a href="../upstaff/login/login.php">
+  <button class="mt-2 w-full py-2 bg-void-elevated text-parchment rounded-lg hover:bg-void-elevated/90 transition-colors">
+    Login
+  </button>
+</a>
+    </div>
+  </div>
+</nav>

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title><?php echo $page_title; ?> · UpStaff</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      font-family: 'Inter', sans-serif;
+    }
+    
+    .quiz-option {
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    
+    .quiz-option:hover {
+      transform: translateX(4px);
+    }
+    
+    .correct-highlight {
+      background-color: #dcfce7 !important;
+      border-color: #22c55e !important;
+    }
+    
+    .preview-badge {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      background: #f59e0b;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.3s ease forwards;
+    }
+    
+    .video-container {
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
+      overflow: hidden;
+    }
+    
+    .video-container iframe,
+    .video-container video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+
+  <!-- Preview Mode Badge -->
+  <div class="preview-badge">
+    <span class="material-symbols-outlined text-sm align-middle mr-1">visibility</span>
+    PREVIEW MODE
+  </div>
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
+            <span class="material-symbols-outlined text-white text-xl">school</span>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-slate-800">Course Preview</h1>
+            <p class="text-xs text-slate-400">Admin preview mode - not taking the actual course</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-right hidden sm:block">
+            <p class="text-xs font-medium text-slate-600"><?php echo htmlspecialchars($user_name); ?></p>
+            <p class="text-[10px] text-slate-400"><?php echo htmlspecialchars($user_email); ?></p>
+          </div>
+          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold shadow-md">
+            <?php echo htmlspecialchars($user_initials); ?>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div class="mb-8 fade-in">
+      <div class="flex justify-between items-start flex-wrap gap-4">
+        <div>
+          <h2 class="text-2xl sm:text-3xl font-bold text-slate-800" id="courseTitleLarge">Loading...</h2>
+          <div class="flex items-center gap-3 mt-2">
+            <span id="courseCategory" class="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium">Loading...</span>
+            <span id="courseDifficulty" class="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-medium">Loading...</span>
+            <span id="courseStatus" class="px-3 py-1 rounded-lg bg-amber-50 text-amber-600 text-xs font-medium">Loading...</span>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <a href="../course_management.php" class="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition flex items-center gap-2">
+            <span class="material-symbols-outlined text-base">arrow_back</span>
+            Back to Management
+          </a>
+          <a href="course-builder/step2.html?id=<?php echo $course_id; ?>" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition flex items-center gap-2">
+            <span class="material-symbols-outlined text-base">edit</span>
+            Edit Course
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- LEFT COLUMN: Video Player -->
+      <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div class="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 relative" id="videoContainer">
+            <video id="videoPlayer" class="w-full h-full" controls>
+              <source id="videoSource" src="" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+            <iframe id="youtubeFrame" class="w-full h-full hidden" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            <div id="noVideoMessage" class="flex items-center justify-center h-full text-white flex-col gap-3 hidden">
+              <span class="material-symbols-outlined text-5xl">videocam_off</span>
+              <p class="text-sm">No video available for this course</p>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <h3 id="videoTitle" class="text-xl font-bold text-slate-800 mb-2">Welcome to the Course</h3>
+                <p id="videoDescription" class="text-slate-500 text-sm leading-relaxed">Watch the video to learn the core concepts.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <h4 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+            <span class="material-symbols-outlined text-blue-500 text-xl">info</span>
+            About This Course
+          </h4>
+          <p id="fullDescription" class="text-slate-600 text-sm leading-relaxed">Loading course description...</p>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="lg:col-span-1 space-y-6">
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-sm font-medium opacity-90">Course Content</span>
+            <span class="text-2xl font-bold" id="totalModulesCount">0</span>
+            <span class="text-sm opacity-90">modules</span>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between">
+              <span>📹 Video lesson:</span>
+              <span id="videoStatusText">Loading...</span>
+            </div>
+            <div class="flex justify-between">
+              <span>📋 Quizzes:</span>
+              <span id="quizzesCount">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span>⏱️ Time limit:</span>
+              <span id="timerLimit">Loading...</span>
+            </div>
+            <div class="flex justify-between">
+              <span>🎯 Passing score:</span>
+              <span id="passingScore">Loading...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quizzes Preview Section -->
+        <div id="quizListSection" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="border-b border-slate-200 px-6 py-4 bg-purple-50">
+            <h3 class="font-semibold text-slate-800 flex items-center gap-2">
+              <span class="material-symbols-outlined text-purple-500">quiz</span>
+              Course Quizzes (Preview)
+            </h3>
+            <p class="text-xs text-slate-500 mt-1">Click on any quiz to preview questions and answers</p>
+          </div>
+          <div id="quizList" class="divide-y divide-slate-100">
+            <!-- Quizzes will be loaded here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Quiz Preview Modal -->
+  <div id="quizModal" class="hidden fixed inset-0 z-50 bg-gradient-to-br from-purple-600 to-indigo-700 overflow-y-auto">
+    <div class="sticky top-0 bg-white/10 backdrop-blur-md border-b border-white/20 p-5 flex justify-between items-center shadow-md">
+      <div>
+        <h3 id="quizModalTitle" class="text-xl font-bold text-white">Quiz Title</h3>
+        <p class="text-xs text-white/80 mt-1 flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">info</span>
+          Preview Mode - Answers are not recorded
+        </p>
+      </div>
+      <button id="closeQuizModal" class="text-white/80 hover:text-white transition p-2">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    
+    <div id="quizQuestionsContainer" class="quiz-card-centered animate-scale-in" style="background: white; border-radius: 24px; max-width: 800px; margin: 40px auto; padding: 30px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);">
+      <!-- Questions will be injected here -->
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none"></div>
+
+  <script>
+    // Course data passed from PHP
+    
+    function fixMediaUrl(url) {
+      if (!url || url === '') return null;
+      if (url.startsWith('http://') || url.startsWith('https://')) return url;
+      if (url.startsWith('/uploads/')) return url;
+      if (url.startsWith('uploads/')) return '/' + url;
+      return '/uploads/' + url;
+    }
+    
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const bg = type === 'error' ? 'bg-red-500' : type === 'warning' ? 'bg-amber-500' : 'bg-blue-500';
+      const icon = type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'info';
+      toast.className = `pointer-events-auto flex items-center gap-2 px-5 py-3 ${bg} text-white text-sm font-medium rounded-xl shadow-lg opacity-0 translate-y-2 transition-all duration-300 z-50`;
+      toast.innerHTML = `<span class="material-symbols-outlined text-base">${icon}</span>${msg}`;
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('opacity-100', 'translate-y-0'), 10);
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+    
+    function displayCourse() {
+      document.getElementById('courseTitleLarge').textContent = courseData.title || 'Untitled Course';
+      document.getElementById('courseCategory').textContent = courseData.category;
+      document.getElementById('courseDifficulty').textContent = courseData.difficulty;
+      document.getElementById('courseStatus').textContent = courseData.status === 'published' ? 'Published' : 'Draft';
+      if (courseData.status === 'published') {
+        document.getElementById('courseStatus').className = 'px-3 py-1 rounded-lg bg-green-50 text-green-600 text-xs font-medium';
+      }
+      document.getElementById('fullDescription').innerHTML = courseData.description;
+      
+      // Video
+      if (courseData.video && courseData.video.video_url) {
+        const videoUrl = fixMediaUrl(courseData.video.video_url);
+        setupVideoPlayer(videoUrl);
+        document.getElementById('videoTitle').textContent = courseData.video.title;
+        document.getElementById('videoDescription').textContent = courseData.video.description;
+        document.getElementById('videoStatusText').innerHTML = '✅ Available';
+      } else {
+        document.getElementById('noVideoMessage').classList.remove('hidden');
+        document.getElementById('videoTitle').textContent = 'No video available';
+        document.getElementById('videoDescription').textContent = 'This course does not have a video lesson.';
+        document.getElementById('videoStatusText').innerHTML = '❌ Not available';
+      }
+      
+      // Stats
+      document.getElementById('totalModulesCount').textContent = courseData.total_modules;
+      document.getElementById('quizzesCount').textContent = courseData.quizzes?.length || 0;
+      
+      const mins = courseData.quiz_settings?.global_timer_minutes || 10;
+      const secs = courseData.quiz_settings?.global_timer_seconds || 0;
+      document.getElementById('timerLimit').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+      document.getElementById('passingScore').textContent = `${courseData.quiz_settings?.passing_threshold || 70}%`;
+      
+      displayQuizList();
+    }
+    
+    function setupVideoPlayer(videoUrl) {
+      const videoPlayer = document.getElementById('videoPlayer');
+      const youtubeFrame = document.getElementById('youtubeFrame');
+      const noVideoMessage = document.getElementById('noVideoMessage');
+      const videoSource = document.getElementById('videoSource');
+      
+      videoPlayer.classList.add('hidden');
+      youtubeFrame.classList.add('hidden');
+      noVideoMessage.classList.add('hidden');
+      
+      if (!videoUrl) {
+        noVideoMessage.classList.remove('hidden');
+        return;
+      }
+      
+      if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+        let embedUrl = videoUrl;
+        if (videoUrl.includes('watch?v=')) {
+          const videoId = videoUrl.split('v=')[1]?.split('&')[0];
+          embedUrl = `https://www.youtube.com/embed/${videoId}`;
+        } else if (videoUrl.includes('youtu.be/')) {
+          const videoId = videoUrl.split('youtu.be/')[1]?.split('?')[0];
+          embedUrl = `https://www.youtube.com/embed/${videoId}`;
+        }
+        youtubeFrame.src = embedUrl;
+        youtubeFrame.classList.remove('hidden');
+        return;
+      }
+      
+      if (videoUrl.match(/\.(mp4|webm|ogg|mov)$/i) || videoUrl.includes('/uploads/')) {
+        videoSource.src = videoUrl;
+        videoPlayer.load();
+        videoPlayer.classList.remove('hidden');
+        return;
+      }
+      
+      noVideoMessage.classList.remove('hidden');
+    }
+    
+    function displayQuizList() {
+      const container = document.getElementById('quizList');
+      const quizzes = courseData.quizzes || [];
+      
+      if (quizzes.length === 0) {
+        container.innerHTML = '<div class="p-6 text-center text-slate-400">No quizzes available for this course</div>';
+        return;
+      }
+      
+      container.innerHTML = quizzes.map((quiz, index) => {
+        return `
+          <div class="p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer" onclick="previewQuiz(${index})">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                <span class="material-symbols-outlined text-purple-600">quiz</span>
+              </div>
+              <div>
+                <h4 class="font-medium text-slate-800">Quiz ${index + 1}: ${escapeHtml(quiz.title)}</h4>
+                <p class="text-xs text-slate-400">${quiz.questions?.length || 0} questions</p>
+              </div>
+            </div>
+            <div>
+              <span class="text-xs text-purple-600 flex items-center gap-1">
+                Preview <span class="material-symbols-outlined text-sm">visibility</span>
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    function previewQuiz(quizIndex) {
+      const quiz = courseData.quizzes[quizIndex];
+      
+      if (!quiz || !quiz.questions || quiz.questions.length === 0) {
+        showToast('This quiz has no questions!', 'warning');
+        return;
+      }
+      
+      document.getElementById('quizModalTitle').textContent = `${quiz.title} (Preview)`;
+      document.getElementById('quizModal').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      
+      renderQuizPreview(quiz);
+    }
+    
+    function renderQuizPreview(quiz) {
+      const container = document.getElementById('quizQuestionsContainer');
+      const totalQuestions = quiz.questions.length;
+      
+      let questionsHtml = '';
+      
+      quiz.questions.forEach((q, qIndex) => {
+        let questionText = q.text || q.question_text || 'Question text missing';
+        
+        let optionsHtml = '';
+        if (q.type === 'tf') {
+          optionsHtml = `
+            <div class="space-y-2 ml-6">
+              <div class="flex items-center gap-3 p-3 rounded-lg ${q.options[0]?.correct ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}">
+                <span class="text-sm font-medium">True</span>
+                ${q.options[0]?.correct ? '<span class="text-xs text-green-600 ml-auto">✓ Correct Answer</span>' : ''}
+              </div>
+              <div class="flex items-center gap-3 p-3 rounded-lg ${q.options[1]?.correct ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}">
+                <span class="text-sm font-medium">False</span>
+                ${q.options[1]?.correct ? '<span class="text-xs text-green-600 ml-auto">✓ Correct Answer</span>' : ''}
+              </div>
+            </div>
+          `;
+        } else {
+          optionsHtml = `
+            <div class="space-y-2 ml-6">
+              ${q.options.map((opt, optIdx) => `
+                <div class="flex items-center gap-3 p-3 rounded-lg ${opt.correct ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}">
+                  <div class="w-6 h-6 rounded-full border ${opt.correct ? 'border-green-500 bg-green-500' : 'border-gray-300'} flex items-center justify-center">
+                    ${opt.correct ? '<span class="text-white text-xs">✓</span>' : ''}
+                  </div>
+                  <span class="text-sm ${opt.correct ? 'text-green-700 font-medium' : 'text-gray-600'}">
+                    ${String.fromCharCode(65 + optIdx)}. ${escapeHtml(opt.text || opt.option_text)}
+                  </span>
+                  ${opt.correct ? '<span class="text-xs text-green-600 ml-auto">✓ Correct Answer</span>' : ''}
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+        
+        questionsHtml += `
+          <div class="mb-6 pb-4 border-b border-slate-100 last:border-0">
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-sm font-medium text-slate-500">Question ${qIndex + 1} of ${totalQuestions}</span>
+            </div>
+            <h4 class="font-semibold text-slate-800 mb-3">${escapeHtml(questionText)}</h4>
+            ${optionsHtml}
+          </div>
+        `;
+      });
+      
+      container.innerHTML = `
+        <div class="mb-4 pb-3 border-b border-slate-200">
+          <div class="flex justify-between items-center">
+            <h3 class="text-lg font-bold text-slate-800">${escapeHtml(quiz.title)}</h3>
+            <span class="text-xs px-2 py-1 bg-purple-100 text-purple-600 rounded-full">Preview Mode</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">${totalQuestions} question${totalQuestions !== 1 ? 's' : ''}</p>
+        </div>
+        ${questionsHtml}
+        <div class="mt-6 p-3 bg-blue-50 rounded-lg text-xs text-blue-700 text-center">
+          <span class="material-symbols-outlined text-sm align-middle mr-1">info</span>
+          This is a preview. In the actual quiz, you'll have a timer and your score will be recorded.
+        </div>
+      `;
+    }
+    
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
+    }
+    
+    // Modal handlers
+    document.getElementById('closeQuizModal')?.addEventListener('click', () => {
+      document.getElementById('quizModal').classList.add('hidden');
+      document.body.style.overflow = '';
+    });
+    
+    document.getElementById('quizModal')?.addEventListener('click', (e) => {
+      if (e.target === document.getElementById('quizModal')) {
+        document.getElementById('quizModal').classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    });
+    
+    // Initialize
+    displayCourse();
+  </script>
+</body>
+</html>
