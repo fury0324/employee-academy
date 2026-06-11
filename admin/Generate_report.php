@@ -1,397 +1,337 @@
 <?php
-// Start session safely
+// generate_report.php - WITH PROPER DATE HANDLING
+error_reporting(0);
+ini_set('display_errors', 0);
+
+ob_start();
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Include database
 require_once __DIR__ . '/../config/db.php';
 
-// Check if user is logged in and is admin
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit();
 }
 
+// AJAX handler for quiz details (same as before)
+if (isset($_GET['ajax']) && $_GET['ajax'] == 'quiz_details') {
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    header('Content-Type: application/json');
+    
+    $user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
+    $course_id = isset($_GET['course_id']) ? intval($_GET['course_id']) : 0;
+    
+    $questions = array();
+    
+    if ($user_id && $course_id) {
+        $query = "SELECT 
+                    uqa.id,
+                    uqa.question_id,
+                    uqa.selected_option,
+                    uqa.is_correct,
+                    q.question_text,
+                    q.type as question_type,
+                    qz.title as quiz_title,
+                    qz.order_index as quiz_order,
+                    opt.option_text as user_answer_text,
+                    correct_opt.option_text as correct_answer_text
+                  FROM user_quiz_answers uqa
+                  INNER JOIN questions q ON uqa.question_id = q.id
+                  INNER JOIN quizzes qz ON uqa.quiz_id = qz.id
+                  LEFT JOIN options opt ON uqa.selected_option = opt.id
+                  LEFT JOIN options correct_opt ON correct_opt.question_id = q.id AND correct_opt.is_correct = 1
+                  WHERE uqa.user_id = $user_id AND qz.course_id = $course_id
+                  ORDER BY qz.order_index ASC, q.order_index ASC";
+        
+        $result = mysqli_query($conn, $query);
+        
+        if ($result && mysqli_num_rows($result) > 0) {
+            while ($row = mysqli_fetch_assoc($result)) {
+                $optionsQuery = "SELECT option_text FROM options WHERE question_id = " . $row['question_id'] . " ORDER BY id ASC";
+                $optionsResult = mysqli_query($conn, $optionsQuery);
+                $options = array();
+                if ($optionsResult) {
+                    while ($opt = mysqli_fetch_assoc($optionsResult)) {
+                        $options[] = $opt['option_text'];
+                    }
+                }
+                
+                $userAnswer = $row['user_answer_text'];
+                if (empty($userAnswer)) {
+                    $userAnswer = 'Not answered';
+                }
+                
+                $correctAnswer = $row['correct_answer_text'] ?: 'N/A';
+                
+                if ($row['question_type'] == 'tf') {
+                    if ($userAnswer == '1' || $userAnswer == 'True' || strtolower($userAnswer) == 'true') {
+                        $userAnswer = 'True';
+                    } elseif ($userAnswer == '0' || $userAnswer == 'False' || strtolower($userAnswer) == 'false') {
+                        $userAnswer = 'False';
+                    }
+                }
+                
+                $questions[] = array(
+                    'question_id' => $row['question_id'],
+                    'question_text' => $row['question_text'],
+                    'question_type' => $row['question_type'],
+                    'user_answer' => $userAnswer,
+                    'correct_answer' => $correctAnswer,
+                    'is_correct' => (bool)$row['is_correct'],
+                    'quiz_title' => $row['quiz_title'],
+                    'options' => $options,
+                    'selected_option_id' => $row['selected_option']
+                );
+            }
+        }
+    }
+    
+    $total = count($questions);
+    $correct = 0;
+    foreach ($questions as $q) {
+        if ($q['is_correct']) $correct++;
+    }
+    $score = $total > 0 ? round(($correct / $total) * 100) : 0;
+    
+    echo json_encode(array(
+        'success' => true,
+        'questions' => $questions,
+        'total_questions' => $total,
+        'total_correct' => $correct,
+        'overall_score' => $score
+    ));
+    exit();
+}
+
 $user_name = $_SESSION['firstname'] ?? 'Admin';
-
-// Get filter parameters
 $searchTerm = isset($_GET['search']) ? $_GET['search'] : '';
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 20;
+$offset = ($page - 1) * $limit;
 
-// Fetch ONLY certificates (one record per completed course)
+// FIXED: Use COALESCE to handle NULL completion dates
 $sql = "SELECT 
+            'certificate' as record_type,
             c.id as record_id,
+            c.user_id,
+            c.course_id,
             u.firstname,
             u.lastname,
             cr.title as course_name,
-            DATE(c.issued_at) as completion_date,
+            c.issued_at as completion_timestamp,
             c.final_score as percentage,
             'Pass' as status
         FROM certificates c
         JOIN users u ON c.user_id = u.id
         JOIN courses cr ON c.course_id = cr.id
         WHERE u.role = 'employee' AND cr.status = 'published'
-        ORDER BY c.issued_at DESC";
+        
+        UNION ALL
+        
+        SELECT 
+            'user_course' as record_type,
+            uc.id as record_id,
+            uc.user_id,
+            uc.course_id,
+            u.firstname,
+            u.lastname,
+            cr.title as course_name,
+            COALESCE(uc.completed_at, uc.last_accessed, uc.started_at, NOW()) as completion_timestamp,
+            COALESCE(uc.final_score, 0) as percentage,
+            CASE 
+                WHEN uc.pass_status = 'failed' THEN 'Fail'
+                WHEN uc.pass_status = 'passed' THEN 'Pass'
+                ELSE 'Completed'
+            END as status
+        FROM user_courses uc
+        JOIN users u ON uc.user_id = u.id
+        JOIN courses cr ON uc.course_id = cr.id
+        WHERE u.role = 'employee' 
+            AND cr.status = 'published'
+            AND uc.status = 'completed'
+            AND uc.pass_status = 'failed'
+            AND NOT EXISTS (
+                SELECT 1 FROM certificates cert 
+                WHERE cert.user_id = uc.user_id 
+                AND cert.course_id = uc.course_id
+            )
+        ORDER BY completion_timestamp DESC, record_id DESC";
 
-$result = $conn->query($sql);
-$reportData = [];
+$result = mysqli_query($conn, $sql);
+$allReportData = array();
 
-if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        // Apply search filter if needed
+if ($result && mysqli_num_rows($result) > 0) {
+    while ($row = mysqli_fetch_assoc($result)) {
         if ($searchTerm) {
             $searchLower = strtolower($searchTerm);
             $name = strtolower($row['firstname'] . ' ' . $row['lastname']);
             $course = strtolower($row['course_name']);
             if (strpos($name, $searchLower) !== false || strpos($course, $searchLower) !== false) {
-                $reportData[] = $row;
+                $allReportData[] = $row;
             }
         } else {
-            $reportData[] = $row;
+            $allReportData[] = $row;
         }
     }
 }
 
-// Calculate statistics
-$totalRecords = count($reportData);
-$passCount = $totalRecords; // Lahat ng certificates ay Pass
-$failCount = 0;
-$passCountByCourse = [];
+$totalRecords = count($allReportData);
+$totalPages = ceil($totalRecords / $limit);
+$reportData = array_slice($allReportData, $offset, $limit);
+$lastUpdated = date('Y-m-d H:i:s');
 
-foreach ($reportData as $record) {
-    $courseName = $record['course_name'];
-    if (!isset($passCountByCourse[$courseName])) {
-        $passCountByCourse[$courseName] = 0;
-    }
-    $passCountByCourse[$courseName]++;
+while (ob_get_level()) {
+    ob_end_clean();
 }
-
-$courseNames = array_keys($passCountByCourse);
-$passCounts = array_values($passCountByCourse);
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Training Completion Report | Upstaff</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        * {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-        }
-        
-        .main-content {
-            margin-left: 16rem;
-            min-height: 100vh;
-            transition: margin-left 0.3s ease;
-            margin-top: 70px;
-        }
-        
-        .main-content.sidebar-collapsed {
-            margin-left: 5rem;
-        }
-        
-        .fixed-header {
-            position: fixed;
-            top: 0;
-            right: 0;
-            left: 0;
-            z-index: 40;
-            background: white;
-            transition: margin-left 0.3s ease, width 0.3s ease;
-            margin-left: 16rem;
-            width: calc(100% - 16rem);
-        }
-        
-        .fixed-header.sidebar-collapsed {
-            margin-left: 5rem;
-            width: calc(100% - 5rem);
-        }
-        
-        @media (max-width: 768px) {
-            .main-content {
-                margin-left: 0 !important;
-            }
-            .fixed-header {
-                margin-left: 0 !important;
-                width: 100% !important;
-            }
-        }
-        
-        .tab-active {
-            background-color: #2563eb;
-            color: white;
-            border-color: #2563eb;
-        }
-
-        .tab-active i {
-            color: white;
-        }
-
-        .tab-inactive {
-            background-color: white;
-            color: #4b5563;
-            border-color: #e5e7eb;
-        }
-
-        .tab-inactive:hover {
-            background-color: #f9fafb;
-        }
-
-        .overflow-x-auto::-webkit-scrollbar {
-            height: 6px;
-        }
-
-        .overflow-x-auto::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-
-        .overflow-x-auto::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 10px;
-        }
-
-        .card-hover {
-            transition: all 0.25s ease-in-out;
-            cursor: pointer;
-            border: 1px solid #f3f4f6;
-        }
-
-        .card-hover:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.15), 0 4px 8px -4px rgba(0, 0, 0, 0.05);
-            border-color: #cbd5e1;
-            background-color: #fefefe;
-        }
-        
-        .table-view, .cards-view {
-            transition: opacity 0.3s ease;
-        }
-        .hidden-view {
-            display: none;
-        }
-        
-        .view-toggle-btn {
-            transition: all 0.2s ease;
-        }
-        .view-toggle-btn.active {
-            background: #2563eb;
-            color: white;
-            border-color: #2563eb;
-        }
+        * { font-family: 'Inter', sans-serif; }
+        .main-content { margin-left: 16rem; min-height: 100vh; margin-top: 70px; transition: margin-left 0.3s; }
+        .main-content.sidebar-collapsed { margin-left: 5rem; }
+        @media (max-width: 768px) { .main-content { margin-left: 0 !important; } }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 16px; max-width: 800px; width: 90%; max-height: 85vh; overflow-y: auto; }
+        .answer-correct { background: #dcfce7; border-left: 4px solid #22c55e; }
+        .answer-wrong { background: #fee2e2; border-left: 4px solid #ef4444; }
+        .status-pass { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+        .status-fail { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .pagination-btn { transition: all 0.2s; }
+        .pagination-btn:hover:not(:disabled) { background: #e5e7eb; }
     </style>
 </head>
-
 <body class="bg-gray-100">
     <?php include __DIR__ . '/../includes/sidebar.php'; ?>
-
+    
     <div class="main-content" id="mainContent">
-        
         <?php include __DIR__ . '/../includes/header.php'; ?>
         
         <div class="p-6">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                        <i class="fas fa-chart-line text-blue-600"></i> Training Completion Report
-                    </h1>
-                    <p class="text-sm text-gray-500 mt-1">Employee course performance - Certificate based completions only</p>
+                    <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-chart-line text-blue-600 mr-2"></i> Training Completion Report</h1>
+                    <p class="text-sm text-gray-500">Newest completions appear first</p>
                 </div>
-                
-                <div class="flex gap-2 bg-white rounded-lg shadow-sm border border-gray-200 p-1">
-                    <button id="tableViewBtn" class="view-toggle-btn active px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 bg-blue-600 text-white">
-                        <i class="fas fa-table"></i> Table View
-                    </button>
-                    <button id="analyticsViewBtn" class="view-toggle-btn px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 text-gray-600 hover:bg-gray-100">
-                        <i class="fas fa-chart-pie"></i> Analytical View
-                    </button>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs text-gray-400">Last updated: <?php echo $lastUpdated; ?></span>
+                    <button id="refreshBtn" class="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"><i class="fas fa-sync-alt"></i></button>
                 </div>
             </div>
             
-            <div class="mb-6">
-                <div class="relative max-w-md">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <i class="fas fa-search text-gray-400 text-sm"></i>
-                    </div>
-                    <input type="text" id="searchInput" placeholder="Search by employee name or course title..."
-                        value="<?php echo htmlspecialchars($searchTerm); ?>"
-                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+            <div class="mb-6 flex flex-col sm:flex-row justify-between gap-4">
+                <input type="text" id="searchInput" placeholder="Search by name or course..." class="w-full sm:w-96 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="<?php echo htmlspecialchars($searchTerm); ?>">
+                <div class="flex gap-3">
+                    <select id="limitSelect" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="10" <?php echo $limit == 10 ? 'selected' : ''; ?>>10 entries</option>
+                        <option value="20" <?php echo $limit == 20 ? 'selected' : ''; ?>>20 entries</option>
+                        <option value="50" <?php echo $limit == 50 ? 'selected' : ''; ?>>50 entries</option>
+                        <option value="100" <?php echo $limit == 100 ? 'selected' : ''; ?>>100 entries</option>
+                    </select>
+                    <button id="exportBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i class="fas fa-file-csv mr-1"></i> Export</button>
                 </div>
             </div>
             
-            <div id="tableView" class="table-view">
-                <div class="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-200">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center flex-wrap gap-3">
-                        <div class="flex items-center gap-3">
-                            <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                                <i class="fas fa-list-check text-blue-500"></i>
-                                Course Completion Records
-                            </h2>
-                            <span id="recordCountBadge" class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full"><?php echo $totalRecords; ?></span>
-                        </div>
-                        <button id="exportCsvBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors duration-150">
-                            <i class="fas fa-file-csv"></i> Export CSV
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-[900px] w-full text-sm text-left text-gray-700">
-                            <thead class="bg-gradient-to-r from-gray-800 to-gray-900 text-white uppercase text-xs tracking-wider">
-                                <tr>
-                                    <th class="px-6 py-4">Employee Name</th>
-                                    <th class="px-6 py-4">Course Name</th>
-                                    <th class="px-6 py-4">Completion Date</th>
-                                    <th class="px-6 py-4">Percentage (%)</th>
-                                    <th class="px-6 py-4">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="reportTableBody" class="divide-y divide-gray-200">
-                                <?php if (count($reportData) > 0): ?>
-                                    <?php foreach ($reportData as $record): ?>
-                                        <?php 
-                                        $percentageColor = $record['percentage'] >= 70 ? "text-green-700 font-semibold" : "text-red-600 font-semibold";
-                                        ?>
-                                        <tr class="hover:bg-blue-50 transition-colors duration-150">
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="flex items-center gap-3">
-                                                    <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
-                                                        <?php echo strtoupper(substr($record['firstname'], 0, 1)); ?>
-                                                    </div>
-                                                    <div class="font-medium text-gray-800">
-                                                        <?php echo htmlspecialchars($record['firstname'] . ' ' . $record['lastname']); ?>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <td class="px-6 py-4 font-medium text-gray-700"><?php echo htmlspecialchars($record['course_name']); ?></div>
-                                            <td class="px-6 py-4 text-gray-600"><?php echo date('m/d/Y', strtotime($record['completion_date'])); ?></div>
-                                            <td class="px-6 py-4 <?php echo $percentageColor; ?>"><?php echo round($record['percentage']); ?>%</div>
-                                            <td class="px-6 py-4">
-                                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border bg-green-100 text-green-700 border-green-200">
-                                                    <i class="fas fa-check-circle text-xs"></i> Pass
-                                                </span>
-                                            </div>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td colspan="5" class="text-center py-12 text-gray-500">
-                                            <i class="fas fa-inbox mr-2"></i> No matching completion records found
-                                        </div>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+            <div class="bg-white rounded-xl shadow overflow-hidden">
+                <div class="p-4 border-b bg-gray-50">
+                    <h2 class="font-semibold"><i class="fas fa-list-check text-blue-500 mr-2"></i> Course Completion Records</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gradient-to-r from-gray-800 to-gray-900 text-white">
+                            <tr>
+                                <th class="px-6 py-3 text-left">Employee</th>
+                                <th class="px-6 py-3 text-left">Course</th>
+                                <th class="px-6 py-3 text-left">Completed</th>
+                                <th class="px-6 py-3 text-left">Score</th>
+                                <th class="px-6 py-3 text-left">Status</th>
+                                <th class="px-6 py-3 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-gray-200">
+                            <?php foreach ($reportData as $record): ?>
+                            <?php 
+                            $fullName = htmlspecialchars($record['firstname'] . ' ' . $record['lastname']);
+                            $courseName = htmlspecialchars($record['course_name']);
+                            $scoreColor = $record['percentage'] >= 70 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold';
+                            $statusClass = $record['status'] == 'Pass' ? 'status-pass' : 'status-fail';
+                            $completionDate = !empty($record['completion_timestamp']) && $record['completion_timestamp'] != '1970-01-01 00:00:00' ? date('m/d/Y g:i A', strtotime($record['completion_timestamp'])) : 'Date not recorded';
+                            $initial = strtoupper(substr($record['firstname'], 0, 1));
+                            ?>
+                            <tr class="hover:bg-blue-50 transition-colors">
+                                <td class="px-6 py-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold"><?php echo $initial; ?></div><span class="font-medium"><?php echo $fullName; ?></span></div></td>
+                                <td class="px-6 py-3"><?php echo $courseName; ?></td>
+                                <td class="px-6 py-3 text-gray-600"><?php echo $completionDate; ?></td>
+                                <td class="px-6 py-3 <?php echo $scoreColor; ?>"><?php echo round($record['percentage']); ?>%</td>
+                                <td class="px-6 py-3"><span class="px-2 py-1 rounded-full text-xs font-medium border <?php echo $statusClass; ?>"><?php echo $record['status']; ?></span></td>
+                                <td class="px-6 py-3 text-center"><button onclick="viewDetails(<?php echo $record['user_id']; ?>, <?php echo $record['course_id']; ?>)" class="px-3 py-1 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white rounded-lg text-xs transition-colors"><i class="fas fa-eye text-xs"></i> View</button></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (count($reportData) == 0): ?>
+                            <tr><td colspan="6" class="text-center py-12 text-gray-500"><i class="fas fa-inbox mr-2"></i> No records found<\/td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php if ($totalRecords > 0): ?>
+                <div class="px-6 py-3 border-t bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-3 text-sm">
+                    <span class="text-gray-600">Showing <?php echo $offset + 1; ?> to <?php echo min($offset + $limit, $totalRecords); ?> of <?php echo $totalRecords; ?> entries</span>
+                    <div class="flex gap-2">
+                        <button id="prevBtn" class="pagination-btn px-3 py-1 border rounded <?php echo $page <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'; ?>" <?php echo $page <= 1 ? 'disabled' : ''; ?>>Previous</button>
+                        <span class="px-3 py-1">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
+                        <button id="nextBtn" class="pagination-btn px-3 py-1 border rounded <?php echo $page >= $totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'; ?>" <?php echo $page >= $totalPages ? 'disabled' : ''; ?>>Next</button>
                     </div>
                 </div>
-            </div>
-            
-            <div id="analyticsView" class="cards-view hidden-view">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-white rounded-xl shadow-md border border-gray-100 p-5 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm font-medium">Total Certificates</p>
-                                <p id="analyticsTotalCount" class="text-2xl font-bold text-gray-800 mt-1"><?php echo $totalRecords; ?></p>
-                            </div>
-                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-certificate text-blue-600 text-lg"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-md border border-gray-100 p-5 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm font-medium">Passed</p>
-                                <p id="analyticsPassCount" class="text-2xl font-bold text-green-600 mt-1"><?php echo $passCount; ?></p>
-                            </div>
-                            <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-check-circle text-green-600 text-lg"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-md border border-gray-100 p-5 card-hover">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm font-medium">Failed</p>
-                                <p id="analyticsFailCount" class="text-2xl font-bold text-red-600 mt-1"><?php echo $failCount; ?></p>
-                            </div>
-                            <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-times-circle text-red-600 text-lg"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-white rounded-xl shadow-md border border-gray-100 p-5">
-                        <h3 class="font-semibold text-gray-700 flex items-center gap-2 border-b pb-2 mb-4">
-                            <i class="fas fa-chart-pie text-indigo-500"></i> Courses Distribution
-                        </h3>
-                        <div class="flex justify-center items-center" style="min-height: 280px;">
-                            <canvas id="donutChartPassedCourses" width="350" height="280"
-                                style="max-width: 100%; height: auto; max-height: 280px;"></canvas>
-                        </div>
-                        <p class="text-xs text-center text-gray-500 mt-3">Each slice represents a course. Slice size = number of employees who completed that course.</p>
-                    </div>
-
-                    <div class="bg-white rounded-xl shadow-md border border-gray-100 p-5">
-                        <h3 class="font-semibold text-gray-700 flex items-center gap-2 border-b pb-2 mb-4">
-                            <i class="fas fa-chart-column text-blue-500"></i> Completion Status
-                        </h3>
-                        <canvas id="statusChart" width="400" height="200" style="max-height: 240px; width: 100%;"></canvas>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="emptyState" class="hidden text-center py-12">
-                <div class="flex flex-col items-center">
-                    <i class="fas fa-chart-line text-gray-400 text-5xl mb-4"></i>
-                    <p class="text-gray-500 text-lg">No records found</p>
-                    <p class="text-gray-400 text-sm mt-1">Try adjusting your search</p>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 
+    <!-- Quiz Modal -->
+    <div id="quizModal" class="modal">
+        <div class="modal-content">
+            <div class="sticky top-0 bg-white border-b px-6 py-4 rounded-t-2xl flex justify-between items-center">
+                <h3 class="text-lg font-bold"><i class="fas fa-clipboard-list text-blue-500 mr-2"></i> Quiz Answers Review</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b">
+                <div class="flex justify-between items-center">
+                    <div><p class="text-sm text-gray-600">Final Score</p><p class="text-3xl font-bold text-blue-600" id="modalScore">0%</p></div>
+                    <div class="text-right"><p class="text-sm text-gray-600">Status</p><p class="text-lg font-semibold" id="modalStatus"></p></div>
+                </div>
+            </div>
+            <div id="questionsList" class="p-6 space-y-3"></div>
+        </div>
+    </div>
+
     <script>
-        const reportData = <?php echo json_encode($reportData); ?>;
-        const courseNames = <?php echo json_encode($courseNames); ?>;
-        const passCounts = <?php echo json_encode($passCounts); ?>;
-        const totalRecords = <?php echo $totalRecords; ?>;
-        const passCount = <?php echo $passCount; ?>;
-        const failCount = <?php echo $failCount; ?>;
-
-        let activeView = "table";
+        const allReportData = <?php echo json_encode($allReportData); ?>;
         let searchTerm = "<?php echo addslashes($searchTerm); ?>";
-        let barChartInstance = null;
-        let donutPassedInstance = null;
-
-        const tableView = document.getElementById("tableView");
-        const analyticsView = document.getElementById("analyticsView");
-        const tableViewBtn = document.getElementById("tableViewBtn");
-        const analyticsViewBtn = document.getElementById("analyticsViewBtn");
-        const searchInput = document.getElementById("searchInput");
-        const reportTableBody = document.getElementById("reportTableBody");
-        const recordCountBadge = document.getElementById("recordCountBadge");
-        const exportCsvBtn = document.getElementById("exportCsvBtn");
-        const emptyState = document.getElementById("emptyState");
-
-        const analyticsTotalCountSpan = document.getElementById("analyticsTotalCount");
-        const analyticsPassCountSpan = document.getElementById("analyticsPassCount");
-        const analyticsFailCountSpan = document.getElementById("analyticsFailCount");
-
+        let currentPage = <?php echo $page; ?>;
+        let currentLimit = <?php echo $limit; ?>;
+        
         const mainContent = document.getElementById("mainContent");
         const fixedHeader = document.querySelector('.fixed-header');
         
         function updateSidebarState() {
             const sidebar = document.getElementById("sidebar");
             if (!sidebar || !mainContent) return;
-            
             if (sidebar.classList.contains("w-20")) {
                 mainContent.classList.add("sidebar-collapsed");
                 if (fixedHeader) fixedHeader.classList.add("sidebar-collapsed");
@@ -401,38 +341,9 @@ $passCounts = array_values($passCountByCourse);
             }
         }
         
-        window.addEventListener('sidebarToggle', function() {
-            setTimeout(updateSidebarState, 10);
-        });
+        window.addEventListener('sidebarToggle', function() { setTimeout(updateSidebarState, 10); });
+        document.addEventListener('DOMContentLoaded', updateSidebarState);
         
-        document.addEventListener('DOMContentLoaded', function() {
-            updateSidebarState();
-            
-            window.addEventListener('resize', function() {
-                if (window.innerWidth <= 768) {
-                    if (fixedHeader) fixedHeader.classList.add('sidebar-collapsed');
-                } else {
-                    updateSidebarState();
-                }
-            });
-        });
-
-        function getFilteredData() {
-            if (!searchTerm.trim()) return [...reportData];
-            const term = searchTerm.trim().toLowerCase();
-            return reportData.filter(function(item) {
-                const fullName = (item.firstname + ' ' + item.lastname).toLowerCase();
-                const courseName = item.course_name.toLowerCase();
-                return fullName.includes(term) || courseName.includes(term);
-            });
-        }
-
-        function formatDate(dateStr) {
-            if (!dateStr) return "N/A";
-            const date = new Date(dateStr);
-            return (date.getMonth() + 1) + '/' + date.getDate() + '/' + date.getFullYear();
-        }
-
         function escapeHtml(str) {
             if (!str) return '';
             return str.replace(/[&<>]/g, function(m) {
@@ -442,234 +353,235 @@ $passCounts = array_values($passCountByCourse);
                 return m;
             });
         }
-
-        function getAvatarInitial(name) {
-            return name ? name.charAt(0).toUpperCase() : "U";
+        
+        function getFilteredData() {
+            if (!searchTerm) return [...allReportData];
+            const term = searchTerm.toLowerCase();
+            return allReportData.filter(item => {
+                const name = (item.firstname + ' ' + item.lastname).toLowerCase();
+                const course = item.course_name.toLowerCase();
+                return name.includes(term) || course.includes(term);
+            });
         }
-
-        function renderTableView() {
-            const filtered = getFilteredData();
-            recordCountBadge.innerText = filtered.length + " record" + (filtered.length !== 1 ? 's' : '');
-            
-            if (filtered.length === 0) {
-                reportTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-12 text-gray-500"><i class="fas fa-inbox mr-2"></i> No matching completion records found</td></tr>';
-                emptyState.classList.remove('hidden');
-                tableView.style.display = 'none';
-                return;
-            }
-            
-            emptyState.classList.add('hidden');
-            tableView.style.display = '';
-            
-            let html = '';
-            for (let i = 0; i < filtered.length; i++) {
-                const item = filtered[i];
-                const percentageColor = item.percentage >= 70 ? "text-green-700 font-semibold" : "text-red-600 font-semibold";
-                const fullName = item.firstname + ' ' + (item.lastname || '');
-                html += '<tr class="hover:bg-blue-50 transition-colors duration-150">' +
-                    '<td class="px-6 py-4 whitespace-nowrap">' +
-                        '<div class="flex items-center gap-3">' +
-                            '<div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">' + getAvatarInitial(fullName) + '</div>' +
-                            '<div class="font-medium text-gray-800">' + escapeHtml(fullName) + '</div>' +
-                        '</div>' +
-                    '</td>' +
-                    '<td class="px-6 py-4 font-medium text-gray-700">' + escapeHtml(item.course_name) + '</td>' +
-                    '<td class="px-6 py-4 text-gray-600">' + formatDate(item.completion_date) + '</td>' +
-                    '<td class="px-6 py-4 ' + percentageColor + '">' + Math.round(item.percentage) + '%</td>' +
-                    '<td class="px-6 py-4"><span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border bg-green-100 text-green-700 border-green-200"><i class="fas fa-check-circle text-xs"></i> Pass</span></td>' +
-                '</tr>';
-            }
-            reportTableBody.innerHTML = html;
-        }
-
-        function exportToCSV() {
-            const filteredData = getFilteredData();
-            if (filteredData.length === 0) {
-                alert("No data to export. Please adjust search filter.");
-                return;
-            }
-            const headers = ["Employee Name", "Course Name", "Completion Date", "Percentage (%)", "Status"];
-            let csvContent = headers.join(",") + "\n";
-            for (let i = 0; i < filteredData.length; i++) {
-                const item = filteredData[i];
-                csvContent += '"' + (item.firstname + ' ' + item.lastname).replace(/"/g, '""') + '",';
-                csvContent += '"' + item.course_name.replace(/"/g, '""') + '",';
-                csvContent += formatDate(item.completion_date) + ',';
-                csvContent += Math.round(item.percentage) + ',';
-                csvContent += item.status + "\n";
-            }
-            const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.href = url;
-            link.setAttribute("download", "training_completion_report.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
-
-        function updateAnalyticsView() {
+        
+        function render() {
             const filtered = getFilteredData();
             const total = filtered.length;
-            let passCountFiltered = 0;
-            for (let i = 0; i < filtered.length; i++) {
-                if (filtered[i].status === "Pass") passCountFiltered++;
+            const pages = Math.ceil(total / currentLimit);
+            if (currentPage > pages) currentPage = pages || 1;
+            const start = (currentPage - 1) * currentLimit;
+            const pageData = filtered.slice(start, start + currentLimit);
+            
+            const url = new URL(window.location.href);
+            if (searchTerm) url.searchParams.set('search', searchTerm); else url.searchParams.delete('search');
+            url.searchParams.set('page', currentPage);
+            url.searchParams.set('limit', currentLimit);
+            window.history.pushState({}, '', url);
+            
+            const showingText = document.querySelector('.px-6.py-3.border-t .text-gray-600');
+            if (showingText && total > 0) {
+                showingText.textContent = `Showing ${start + 1} to ${Math.min(start + currentLimit, total)} of ${total} entries`;
             }
-            const failCountFiltered = total - passCountFiltered;
-
-            analyticsTotalCountSpan.innerText = total;
-            analyticsPassCountSpan.innerText = passCountFiltered;
-            analyticsFailCountSpan.innerText = failCountFiltered;
-
-            if (total === 0) {
-                emptyState.classList.remove('hidden');
-                analyticsView.style.display = 'none';
+            const pageSpan = document.querySelector('.px-6.py-3.border-t span:not(.text-gray-600)');
+            if (pageSpan) pageSpan.innerHTML = `Page ${currentPage} of ${pages}`;
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            if (prevBtn) prevBtn.disabled = currentPage <= 1;
+            if (nextBtn) nextBtn.disabled = currentPage >= pages;
+            
+            if (pageData.length === 0) {
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="text-center py-12 text-gray-500"><i class="fas fa-inbox mr-2"></i> No matching records found<\/td></td>';
                 return;
             }
             
-            emptyState.classList.add('hidden');
-            analyticsView.style.display = '';
-
-            if (barChartInstance) barChartInstance.destroy();
-            const barCtx = document.getElementById('statusChart').getContext('2d');
-            barChartInstance = new Chart(barCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Pass', 'Fail'],
-                    datasets: [{
-                        label: 'Number of Completions',
-                        data: [passCountFiltered, failCountFiltered],
-                        backgroundColor: ['#22c55e', '#ef4444'],
-                        borderRadius: 8,
-                        barPercentage: 0.6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: { position: 'top', labels: { font: { size: 12 } } },
-                        tooltip: { callbacks: { label: function(ctx) { return ctx.raw + ' records'; } } }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, title: { display: true, text: 'Count', font: { size: 11 } } },
-                        x: { title: { display: true, text: 'Status', font: { size: 11 } } }
+            let html = '';
+            for (let item of pageData) {
+                const scoreColor = item.percentage >= 70 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold';
+                const statusClass = item.status === 'Pass' ? 'status-pass' : 'status-fail';
+                let completionDate = item.completion_timestamp ? new Date(item.completion_timestamp).toLocaleString() : 'Date not recorded';
+                if (completionDate.includes('1970')) completionDate = 'Date not recorded';
+                const initial = (item.firstname || 'U').charAt(0).toUpperCase();
+                html += `<tr class="hover:bg-blue-50 transition-colors">
+                    <td class="px-6 py-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold">${initial}</div><span class="font-medium">${escapeHtml(item.firstname + ' ' + (item.lastname || ''))}</span></div></td>
+                    <td class="px-6 py-3">${escapeHtml(item.course_name)}</td>
+                    <td class="px-6 py-3 text-gray-600">${completionDate}</td>
+                    <td class="px-6 py-3 ${scoreColor}">${Math.round(item.percentage)}%</td>
+                    <td class="px-6 py-3"><span class="px-2 py-1 rounded-full text-xs font-medium border ${statusClass}">${item.status}</span></td>
+                    <td class="px-6 py-3 text-center"><button onclick="viewDetails(${item.user_id}, ${item.course_id})" class="px-3 py-1 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white rounded-lg text-xs transition-colors"><i class="fas fa-eye text-xs"></i> View</button></td>
+                  </tr>`;
+            }
+            document.getElementById('tableBody').innerHTML = html;
+        }
+        
+        async function viewDetails(userId, courseId) {
+            const modal = document.getElementById('quizModal');
+            modal.classList.add('active');
+            document.getElementById('questionsList').innerHTML = '<div class="text-center py-8"><div class="loading-spinner mb-2"></div><p>Loading quiz details...</p></div>';
+            document.getElementById('modalScore').innerHTML = '0%';
+            document.getElementById('modalStatus').innerHTML = '';
+            
+            try {
+                const response = await fetch(`?ajax=quiz_details&user_id=${userId}&course_id=${courseId}`);
+                const data = await response.json();
+                
+                if (data.success && data.questions && data.questions.length > 0) {
+                    displayQuestions(data.questions);
+                    document.getElementById('modalScore').innerHTML = data.overall_score + '%';
+                    const statusEl = document.getElementById('modalStatus');
+                    if (data.overall_score >= 70) {
+                        statusEl.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i> Passed</span>';
+                    } else {
+                        statusEl.innerHTML = '<span class="text-red-600"><i class="fas fa-times-circle mr-1"></i> Failed</span>';
+                    }
+                } else {
+                    document.getElementById('questionsList').innerHTML = '<div class="text-center text-amber-600 py-8"><i class="fas fa-exclamation-triangle text-4xl mb-3 opacity-50"></i><p>No quiz answers found for this completion record.</p><p class="text-sm mt-2 text-gray-500">The employee may not have taken the quizzes yet.</p></div>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('questionsList').innerHTML = `<div class="text-center text-red-500 py-8"><i class="fas fa-exclamation-circle text-4xl mb-3"></i><p>Failed to load quiz details.</p><p class="text-sm mt-1">${error.message}</p></div>`;
+            }
+        }
+        
+        function displayQuestions(questions) {
+            let html = '', correct = 0, currentQuiz = '';
+            const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+            
+            for (let i = 0; i < questions.length; i++) {
+                const q = questions[i];
+                if (q.is_correct) correct++;
+                const isCorrect = q.is_correct;
+                const bgClass = isCorrect ? 'answer-correct' : 'answer-wrong';
+                const statusIcon = isCorrect ? '<i class="fas fa-check-circle text-green-500"></i>' : '<i class="fas fa-times-circle text-red-500"></i>';
+                
+                let userAnswer = q.user_answer || 'Not answered';
+                let correctAnswer = q.correct_answer || 'N/A';
+                
+                if (userAnswer === 'Not answered' && q.selected_option_id !== undefined && q.selected_option_id !== null) {
+                    const optionIndex = parseInt(q.selected_option_id);
+                    if (optionIndex >= 0 && optionIndex < letters.length && q.options && q.options[optionIndex]) {
+                        userAnswer = `${letters[optionIndex]}. ${q.options[optionIndex]}`;
+                    }
+                } else if (userAnswer !== 'Not answered' && q.options && q.options.length > 0) {
+                    const userAnswerIndex = q.options.findIndex(opt => opt === userAnswer);
+                    if (userAnswerIndex !== -1) {
+                        userAnswer = `${letters[userAnswerIndex]}. ${userAnswer}`;
                     }
                 }
-            });
-
-            const passCountByCourseLocal = new Map();
-            for (let i = 0; i < filtered.length; i++) {
-                const course = filtered[i].course_name;
-                passCountByCourseLocal.set(course, (passCountByCourseLocal.get(course) || 0) + 1);
-            }
-
-            const courseNamesLocal = Array.from(passCountByCourseLocal.keys());
-            const passCountsLocal = courseNamesLocal.map(function(course) { return passCountByCourseLocal.get(course); });
-
-            if (donutPassedInstance) donutPassedInstance.destroy();
-            const donutCtx = document.getElementById('donutChartPassedCourses').getContext('2d');
-
-            if (courseNamesLocal.length === 0) {
-                donutPassedInstance = new Chart(donutCtx, {
-                    type: 'doughnut',
-                    data: { labels: ['No Courses'], datasets: [{ data: [1], backgroundColor: ['#e5e7eb'], borderWidth: 0 }] },
-                    options: { cutout: '60%', plugins: { legend: { position: 'bottom' } } }
-                });
-            } else {
-                const colorPalette = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec489a', '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#d946ef'];
-                const backgroundColors = [];
-                for (let i = 0; i < courseNamesLocal.length; i++) {
-                    backgroundColors.push(colorPalette[i % colorPalette.length]);
-                }
-
-                donutPassedInstance = new Chart(donutCtx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: courseNamesLocal,
-                        datasets: [{
-                            data: passCountsLocal,
-                            backgroundColor: backgroundColors,
-                            borderWidth: 2,
-                            borderColor: '#ffffff',
-                            hoverOffset: 12,
-                            cutout: '60%',
-                            radius: '85%'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        plugins: {
-                            legend: {
-                                position: 'bottom', labels: {
-                                    font: { size: 11 }, usePointStyle: true, boxWidth: 10, generateLabels: function(chart) {
-                                        const original = Chart.defaults.plugins.legend.labels.generateLabels(chart);
-                                        for (let i = 0; i < original.length; i++) {
-                                            if (original[i].text !== 'No Courses') {
-                                                original[i].text = original[i].text + ' (' + passCountsLocal[i] + ')';
-                                            }
-                                        }
-                                        return original;
-                                    }
-                                }
-                            },
-                            tooltip: { callbacks: { label: function(ctx) { return ctx.label + ': ' + ctx.raw + ' completions'; } } }
-                        },
-                        layout: { padding: 10 }
+                
+                if (correctAnswer !== 'N/A' && q.options && q.options.length > 0) {
+                    const correctAnswerIndex = q.options.findIndex(opt => opt === correctAnswer);
+                    if (correctAnswerIndex !== -1) {
+                        correctAnswer = `${letters[correctAnswerIndex]}. ${correctAnswer}`;
                     }
-                });
+                }
+                
+                if (q.quiz_title && q.quiz_title !== currentQuiz) {
+                    currentQuiz = q.quiz_title;
+                    html += `<div class="bg-blue-100 rounded-lg p-2 mb-2"><p class="font-bold text-blue-800 text-sm"><i class="fas fa-book mr-1"></i> Quiz: ${escapeHtml(currentQuiz)}</p></div>`;
+                }
+                
+                let optionsHtml = '';
+                if (q.options && q.options.length > 0) {
+                    const optionsList = q.options.map((opt, idx) => {
+                        let isUserAnswer = false;
+                        if (q.user_answer === opt) {
+                            isUserAnswer = true;
+                        } else if (q.selected_option_id !== undefined && parseInt(q.selected_option_id) === idx) {
+                            isUserAnswer = true;
+                        }
+                        const isCorrectAnswer = (opt === q.correct_answer);
+                        let style = '';
+                        if (isUserAnswer && isCorrectAnswer) {
+                            style = 'text-green-600 font-bold';
+                        } else if (isUserAnswer && !isCorrectAnswer) {
+                            style = 'text-red-600 line-through';
+                        } else if (isCorrectAnswer) {
+                            style = 'text-green-600';
+                        }
+                        return `<span class="${style}">${letters[idx]}. ${escapeHtml(opt)}</span>`;
+                    }).join(' | ');
+                    optionsHtml = `<div class="mt-2 text-xs text-gray-500"><span class="font-medium">Options:</span> ${optionsList}</div>`;
+                }
+                
+                html += `<div class="question-item ${bgClass} rounded-lg p-3 transition-all mb-2">
+                    <div class="flex items-start gap-2">
+                        ${statusIcon}
+                        <div class="flex-1">
+                            <p class="font-semibold text-gray-800 text-sm">Question ${i+1}: ${escapeHtml(q.question_text)}</p>
+                            <div class="mt-1 text-sm">
+                                <p class="text-gray-700"><span class="font-medium">📝 Employee Answer:</span> 
+                                    <span class="${isCorrect ? 'text-green-700' : 'text-red-700'} font-medium">
+                                        ${escapeHtml(userAnswer)}
+                                    </span>
+                                </p>
+                                ${!isCorrect ? `<p class="text-gray-700 mt-1"><span class="font-medium">✅ Correct Answer:</span> <span class="text-green-700">${escapeHtml(correctAnswer)}</span></p>` : ''}
+                                ${optionsHtml}
+                            </div>
+                        </div>
+                        <div><span class="text-xs font-semibold ${isCorrect ? 'text-green-600' : 'text-red-600'} px-2 py-1 rounded-full bg-white/60">${isCorrect ? 'Correct' : 'Wrong'}</span></div>
+                    </div>
+                </div>`;
             }
+            
+            const summary = `<div class="bg-gray-50 rounded-lg p-3 mb-3 border">
+                <div class="flex justify-between flex-wrap gap-2 text-sm">
+                    <span>📊 Total: <strong>${questions.length}</strong></span>
+                    <span class="text-green-600">✓ Correct: <strong>${correct}</strong></span>
+                    <span class="text-red-600">✗ Wrong: <strong>${questions.length - correct}</strong></span>
+                    <span class="text-blue-600">🎯 Accuracy: <strong>${Math.round((correct/questions.length)*100)}%</strong></span>
+                </div>
+            </div>`;
+            
+            document.getElementById('questionsList').innerHTML = summary + html;
         }
-
-        function renderCurrentView() {
-            if (activeView === "table") {
-                renderTableView();
-            } else {
-                updateAnalyticsView();
+        
+        function closeModal() {
+            document.getElementById('quizModal').classList.remove('active');
+        }
+        
+        document.getElementById('searchInput').addEventListener('input', function() {
+            searchTerm = this.value;
+            currentPage = 1;
+            render();
+        });
+        
+        document.getElementById('limitSelect').addEventListener('change', function() {
+            currentLimit = parseInt(this.value);
+            currentPage = 1;
+            render();
+        });
+        
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        if (prevBtn) prevBtn.addEventListener('click', function() { if (currentPage > 1) { currentPage--; render(); } });
+        if (nextBtn) nextBtn.addEventListener('click', function() { 
+            const filtered = getFilteredData();
+            const pages = Math.ceil(filtered.length / currentLimit);
+            if (currentPage < pages) { currentPage++; render(); } 
+        });
+        
+        document.getElementById('refreshBtn').addEventListener('click', function() { location.reload(); });
+        
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            const filtered = getFilteredData();
+            let csv = "\uFEFFEmployee Name,Course Name,Completion Date & Time,Percentage (%),Status\n";
+            for (let item of filtered) {
+                let completionDate = item.completion_timestamp ? new Date(item.completion_timestamp).toLocaleString() : 'Date not recorded';
+                if (completionDate.includes('1970')) completionDate = 'Date not recorded';
+                csv += `"${item.firstname} ${item.lastname}","${item.course_name}","${completionDate}",${Math.round(item.percentage)},${item.status}\n`;
             }
-        }
-
-        function setActiveView(view) {
-            activeView = view;
-            if (view === "table") {
-                tableView.classList.remove('hidden-view');
-                analyticsView.classList.add('hidden-view');
-                tableViewBtn.classList.add('active', 'bg-blue-600', 'text-white');
-                tableViewBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
-                analyticsViewBtn.classList.remove('active', 'bg-blue-600', 'text-white');
-                analyticsViewBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
-                renderTableView();
-            } else {
-                tableView.classList.add('hidden-view');
-                analyticsView.classList.remove('hidden-view');
-                analyticsViewBtn.classList.add('active', 'bg-blue-600', 'text-white');
-                analyticsViewBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
-                tableViewBtn.classList.remove('active', 'bg-blue-600', 'text-white');
-                tableViewBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
-                updateAnalyticsView();
-            }
-        }
-
-        function onSearchHandler() {
-            searchTerm = searchInput.value;
-            const url = new URL(window.location.href);
-            if (searchTerm) {
-                url.searchParams.set('search', searchTerm);
-            } else {
-                url.searchParams.delete('search');
-            }
-            window.history.pushState({}, '', url);
-            renderCurrentView();
-        }
-
-        tableViewBtn.addEventListener("click", function() { setActiveView("table"); });
-        analyticsViewBtn.addEventListener("click", function() { setActiveView("analytics"); });
-        searchInput.addEventListener("input", onSearchHandler);
-        if (exportCsvBtn) exportCsvBtn.addEventListener("click", exportToCSV);
-
-        setActiveView("table");
+            const blob = new Blob([csv], {type: "text/csv;charset=utf-8"});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `training_report_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+        
+        document.getElementById('quizModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+        document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+        
+        render();
     </script>
 </body>
 </html>
